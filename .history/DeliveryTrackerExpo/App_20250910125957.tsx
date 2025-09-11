@@ -45,20 +45,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Location permission is required for this app to function.');
-        return;
-      }
-      
-      // Request background location for better accuracy
-      const { status: bgStatus } = await Location.requestBackgroundPermissionsAsync();
-      if (bgStatus === 'granted') {
-        console.log('Background location permission granted - enhanced accuracy available');
-      }
-    })();
-
     // Initialize with a sample delivery
     setDeliveryStatus('pending');
   }, []);
@@ -77,8 +63,7 @@ export default function App() {
 
       // Get current location
       const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.BestForNavigation,
-        mayShowUserSettingsDialog: true,
+        accuracy: Location.Accuracy.Balanced,
       });
 
       const locationData: LocationData = {

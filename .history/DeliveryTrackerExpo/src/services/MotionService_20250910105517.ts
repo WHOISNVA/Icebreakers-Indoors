@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 import { DeviceMotion, Accelerometer, Gyroscope } from 'expo-sensors';
+import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 
 export type MotionActivity = 'stationary' | 'walking' | 'running' | 'automotive' | 'unknown';
 
@@ -27,8 +28,6 @@ class MotionService {
   private motionBuffer: number[] = [];
   private bufferSize: number = 10;
   private activityDetectionInterval: any = null;
-  private locationReadings: Location.LocationObject[] = [];
-  private readonly MAX_READINGS = 5;
 
   constructor(config: MotionServiceConfig = {}) {
     this.config = {
@@ -47,9 +46,30 @@ class MotionService {
         return false;
       }
 
-      // For motion permissions, Expo sensors don't require explicit permissions
-      // They work out of the box on both iOS and Android
-      console.log('Motion sensors ready - no additional permissions needed in Expo');
+      // Request motion permissions based on platform
+      if (Platform.OS === 'ios') {
+        const motionPermission = await check(PERMISSIONS.IOS.MOTION);
+        if (motionPermission !== RESULTS.GRANTED) {
+          const result = await request(PERMISSIONS.IOS.MOTION);
+          if (result !== RESULTS.GRANTED) {
+            console.warn('Motion permission not granted on iOS');
+            return false;
+          }
+        }
+      } else if (Platform.OS === 'android') {
+        // Android doesn't require explicit motion permissions for accelerometer
+        // But we might need activity recognition permission for Android 10+
+        if (Platform.Version >= 29) {
+          const activityPermission = await check(PERMISSIONS.ANDROID.ACTIVITY_RECOGNITION);
+          if (activityPermission !== RESULTS.GRANTED) {
+            const result = await request(PERMISSIONS.ANDROID.ACTIVITY_RECOGNITION);
+            if (result !== RESULTS.GRANTED) {
+              console.warn('Activity recognition permission not granted on Android');
+              // Continue anyway as we can still use accelerometer
+            }
+          }
+        }
+      }
 
       return true;
     } catch (error) {
@@ -228,7 +248,6 @@ class MotionService {
 
   private async triggerLocationBurst(): Promise<void> {
     console.log('Triggering location burst due to motion');
-    this.locationReadings = []; // Reset readings
 
     try {
       // Start high-accuracy location updates
@@ -236,31 +255,11 @@ class MotionService {
         {
           accuracy: Location.Accuracy.BestForNavigation,
           timeInterval: 1000, // Update every second
-          distanceInterval: 0.3, // Update every 0.3 meters (approximately 1 foot)
-          mayShowUserSettingsDialog: true, // Prompt user to enable high accuracy if needed
+          distanceInterval: 1, // Update every meter
         },
         (location) => {
-          // Collect multiple readings for better accuracy
-          this.locationReadings.push(location);
-          if (this.locationReadings.length > this.MAX_READINGS) {
-            this.locationReadings.shift();
-          }
-
-          // Filter out readings with poor accuracy (> 5 meters)
-          const accurateReadings = this.locationReadings.filter(
-            loc => loc.coords.accuracy && loc.coords.accuracy <= 5
-          );
-
-          // Use the most accurate reading or average if multiple good readings
-          let bestLocation = location;
-          if (accurateReadings.length > 0) {
-            bestLocation = accurateReadings.reduce((best, current) => 
-              (current.coords.accuracy || Infinity) < (best.coords.accuracy || Infinity) ? current : best
-            );
-          }
-
           if (this.config.onLocationBurst) {
-            this.config.onLocationBurst(bestLocation);
+            this.config.onLocationBurst(location);
           }
         }
       );

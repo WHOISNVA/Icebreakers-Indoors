@@ -27,8 +27,6 @@ class MotionService {
   private motionBuffer: number[] = [];
   private bufferSize: number = 10;
   private activityDetectionInterval: any = null;
-  private locationReadings: Location.LocationObject[] = [];
-  private readonly MAX_READINGS = 5;
 
   constructor(config: MotionServiceConfig = {}) {
     this.config = {
@@ -228,7 +226,6 @@ class MotionService {
 
   private async triggerLocationBurst(): Promise<void> {
     console.log('Triggering location burst due to motion');
-    this.locationReadings = []; // Reset readings
 
     try {
       // Start high-accuracy location updates
@@ -240,27 +237,8 @@ class MotionService {
           mayShowUserSettingsDialog: true, // Prompt user to enable high accuracy if needed
         },
         (location) => {
-          // Collect multiple readings for better accuracy
-          this.locationReadings.push(location);
-          if (this.locationReadings.length > this.MAX_READINGS) {
-            this.locationReadings.shift();
-          }
-
-          // Filter out readings with poor accuracy (> 5 meters)
-          const accurateReadings = this.locationReadings.filter(
-            loc => loc.coords.accuracy && loc.coords.accuracy <= 5
-          );
-
-          // Use the most accurate reading or average if multiple good readings
-          let bestLocation = location;
-          if (accurateReadings.length > 0) {
-            bestLocation = accurateReadings.reduce((best, current) => 
-              (current.coords.accuracy || Infinity) < (best.coords.accuracy || Infinity) ? current : best
-            );
-          }
-
           if (this.config.onLocationBurst) {
-            this.config.onLocationBurst(bestLocation);
+            this.config.onLocationBurst(location);
           }
         }
       );
