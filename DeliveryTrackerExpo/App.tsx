@@ -18,21 +18,30 @@ interface LocationData {
   longitude: number;
   accuracy: number;
   timestamp: number;
+  isMotionRefined?: boolean;
 }
 
 export default function App() {
   const [currentLocation, setCurrentLocation] = useState<LocationData | null>(null);
   const [isTracking, setIsTracking] = useState(false);
   const [deliveryStatus, setDeliveryStatus] = useState('pending');
+  const [currentMotion, setCurrentMotion] = useState<string>('unknown');
 
   const motionService = new MotionService({
     onMotionChange: (motion) => {
       console.log('Motion changed:', motion);
-      // Handle motion change (e.g., update UI or state)
+      setCurrentMotion(motion.activity);
     },
     onLocationBurst: (location) => {
       console.log('Location burst:', location);
-      // Handle location burst (e.g., update map or state)
+      const locationData: LocationData = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        accuracy: location.coords.accuracy || 0,
+        timestamp: location.timestamp,
+        isMotionRefined: (location.coords.accuracy || 0) <= 1.0
+      };
+      setCurrentLocation(locationData);
     },
   });
 
@@ -75,23 +84,42 @@ export default function App() {
         return;
       }
 
-      // Get current location
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.BestForNavigation,
-        mayShowUserSettingsDialog: true,
+      // Enable network provider for better accuracy
+      await Location.enableNetworkProviderAsync().catch(() => {
+        console.log('Network provider not available');
       });
 
+      // Get multiple readings for better accuracy
+      const readings: Location.LocationObject[] = [];
+      
+      // Take 3 quick readings
+      for (let i = 0; i < 3; i++) {
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.BestForNavigation,
+          mayShowUserSettingsDialog: true,
+        });
+        readings.push(location);
+        
+        // Small delay between readings
+        if (i < 2) await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      // Find the most accurate reading
+      const bestReading = readings.reduce((best, current) => 
+        (current.coords.accuracy || Infinity) < (best.coords.accuracy || Infinity) ? current : best
+      );
+
       const locationData: LocationData = {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        accuracy: location.coords.accuracy || 0,
-        timestamp: location.timestamp,
+        latitude: bestReading.coords.latitude,
+        longitude: bestReading.coords.longitude,
+        accuracy: bestReading.coords.accuracy || 0,
+        timestamp: bestReading.timestamp,
       };
 
       setCurrentLocation(locationData);
       Alert.alert(
         'Location Found!',
-        `Lat: ${locationData.latitude.toFixed(6)}\nLng: ${locationData.longitude.toFixed(6)}\nAccuracy: ${locationData.accuracy.toFixed(0)}m`
+        `Lat: ${locationData.latitude.toFixed(6)}\nLng: ${locationData.longitude.toFixed(6)}\nAccuracy: ${locationData.accuracy.toFixed(1)}m (${(locationData.accuracy * 3.28084).toFixed(1)}ft)`
       );
     } catch (error) {
       console.error('Get current location error:', error);
@@ -152,6 +180,15 @@ export default function App() {
     }
   };
 
+  const getMotionColor = (motion: string) => {
+    switch (motion) {
+      case 'SIT': return '#34C759';
+      case 'WALK': return '#007AFF';
+      case 'RUN': return '#FF9500';
+      default: return '#8E8E93';
+    }
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F8F9FA" />
@@ -185,18 +222,35 @@ export default function App() {
             <Text style={styles.locationText}>
               Longitude: {currentLocation.longitude.toFixed(6)}
             </Text>
-            <Text style={styles.locationText}>
-              Accuracy: {currentLocation.accuracy.toFixed(0)} meters
+            <Text style={[
+              styles.locationText,
+              currentLocation.accuracy <= 1.0 && styles.highAccuracyText
+            ]}>
+              Accuracy: {currentLocation.accuracy.toFixed(1)}m ({(currentLocation.accuracy * 3.28084).toFixed(1)}ft)
+              {currentLocation.accuracy <= 1.0 && ' ✓'}
             </Text>
             <Text style={styles.locationText}>
               Time: {new Date(currentLocation.timestamp).toLocaleTimeString()}
             </Text>
+            {currentLocation.isMotionRefined && (
+              <Text style={styles.motionRefinedText}>
+                📍 Motion-Refined Position
+              </Text>
+            )}
           </View>
         ) : (
           <Text style={styles.noLocationText}>
             No location data available. Tap "Get Location" to find your current position.
           </Text>
         )}
+        
+        {/* Motion Status */}
+        <View style={styles.motionStatus}>
+          <Text style={styles.motionStatusLabel}>Motion Status:</Text>
+          <Text style={[styles.motionStatusText, { color: getMotionColor(currentMotion) }]}>
+            {currentMotion.charAt(0).toUpperCase() + currentMotion.slice(1)}
+          </Text>
+        </View>
       </View>
 
       {/* Controls */}
@@ -393,5 +447,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#3C3C43',
     marginBottom: 4,
+  },
+  highAccuracyText: {
+    color: '#34C759',
+    fontWeight: 'bold',
+  },
+  motionRefinedText: {
+    fontSize: 12,
+    color: '#34C759',
+    fontStyle: 'italic',
+    marginTop: 4,
+  },
+  motionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+  },
+  motionStatusLabel: {
+    fontSize: 14,
+    color: '#8E8E93',
+    marginRight: 8,
+  },
+  motionStatusText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

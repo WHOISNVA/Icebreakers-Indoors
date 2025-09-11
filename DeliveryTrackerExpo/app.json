@@ -51,7 +51,9 @@
           "locationAlwaysPermission": "This app needs access to location to track delivery progress and provide real-time updates even when the app is in the background.",
           "locationWhenInUsePermission": "This app needs access to location to track delivery progress and provide real-time updates.",
           "isIosBackgroundLocationEnabled": true,
-          "isAndroidBackgroundLocationEnabled": true
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true,
+          "androidLocationAccuracy": "BestForNavigation"
         }
       ],
       [
