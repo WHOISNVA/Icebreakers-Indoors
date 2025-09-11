@@ -1,7 +1,6 @@
 import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 import { DeviceMotion, Accelerometer, Gyroscope } from 'expo-sensors';
-import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 
 export type MotionActivity = 'stationary' | 'walking' | 'running' | 'automotive' | 'unknown';
 
@@ -46,29 +45,17 @@ class MotionService {
         return false;
       }
 
-      // Request motion permissions based on platform
-      if (Platform.OS === 'ios') {
-        const motionPermission = await check(PERMISSIONS.IOS.MOTION);
-        if (motionPermission !== RESULTS.GRANTED) {
-          const result = await request(PERMISSIONS.IOS.MOTION);
-          if (result !== RESULTS.GRANTED) {
-            console.warn('Motion permission not granted on iOS');
-            return false;
-          }
+      // Motion permission handling in Expo Go / managed workflow:
+      // - iOS may prompt automatically when starting DeviceMotion listener (iOS 13+)
+      // - Android does not require explicit permission for accelerometer/gyroscope in Expo Go
+      // We can check availability to fail fast without using native permission modules.
+      try {
+        const isDeviceMotionAvailable = await DeviceMotion.isAvailableAsync();
+        if (!isDeviceMotionAvailable && Platform.OS === 'ios') {
+          console.warn('DeviceMotion not available; motion features may be limited');
         }
-      } else if (Platform.OS === 'android') {
-        // Android doesn't require explicit motion permissions for accelerometer
-        // But we might need activity recognition permission for Android 10+
-        if (Platform.Version >= 29) {
-          const activityPermission = await check(PERMISSIONS.ANDROID.ACTIVITY_RECOGNITION);
-          if (activityPermission !== RESULTS.GRANTED) {
-            const result = await request(PERMISSIONS.ANDROID.ACTIVITY_RECOGNITION);
-            if (result !== RESULTS.GRANTED) {
-              console.warn('Activity recognition permission not granted on Android');
-              // Continue anyway as we can still use accelerometer
-            }
-          }
-        }
+      } catch (e) {
+        console.warn('Unable to determine DeviceMotion availability:', e);
       }
 
       return true;
