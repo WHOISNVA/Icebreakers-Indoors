@@ -9,6 +9,7 @@ import {
   StatusBar,
 } from 'react-native';
 import * as Location from 'expo-location';
+import MotionService from './src/services/MotionService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -23,6 +24,25 @@ export default function App() {
   const [currentLocation, setCurrentLocation] = useState<LocationData | null>(null);
   const [isTracking, setIsTracking] = useState(false);
   const [deliveryStatus, setDeliveryStatus] = useState('pending');
+
+  const motionService = new MotionService({
+    onMotionChange: (motion) => {
+      console.log('Motion changed:', motion);
+      // Handle motion change (e.g., update UI or state)
+    },
+    onLocationBurst: (location) => {
+      console.log('Location burst:', location);
+      // Handle location burst (e.g., update map or state)
+    },
+  });
+
+  useEffect(() => {
+    motionService.startMonitoring();
+
+    return () => {
+      motionService.stopMonitoring();
+    };
+  }, []);
 
   useEffect(() => {
     // Initialize with a sample delivery
