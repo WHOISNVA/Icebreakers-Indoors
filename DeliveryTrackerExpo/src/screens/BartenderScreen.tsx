@@ -141,10 +141,15 @@ export default function BartenderScreen() {
         </View>
       )}
 
-      <MapModal 
+      <MapModal
         visible={mapVisible}
         order={selectedOrder}
         onClose={closeMap}
+        onComplete={() => {
+          if (selectedOrder) {
+            orderService.updateStatus(selectedOrder.id, 'completed');
+          }
+        }}
       />
     </ScrollView>
   );

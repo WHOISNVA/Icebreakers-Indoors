@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   StatusBar,
+  Platform,
 } from 'react-native';
 import UserScreen from './src/screens/UserScreen';
 import BartenderScreen from './src/screens/BartenderScreen';
@@ -54,7 +55,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#1a1a2e',
     paddingHorizontal: 24,
-    paddingTop: 20,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },

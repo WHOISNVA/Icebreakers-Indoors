@@ -7,11 +7,12 @@ interface MapModalProps {
   visible: boolean;
   order: Order | null;
   onClose: () => void;
+  onComplete?: () => void;
 }
 
 const { width, height } = Dimensions.get('window');
 
-export default function MapModal({ visible, order, onClose }: MapModalProps) {
+export default function MapModal({ visible, order, onClose, onComplete }: MapModalProps) {
   if (!order) return null;
 
   // Calculate the region to show both markers
@@ -143,6 +144,20 @@ export default function MapModal({ visible, order, onClose }: MapModalProps) {
               )}
             </View>
           </View>
+          
+          {order.status !== 'completed' && onComplete && (
+            <View style={styles.actionContainer}>
+              <TouchableOpacity 
+                style={styles.completeButton} 
+                onPress={() => {
+                  onComplete();
+                  onClose();
+                }}
+              >
+                <Text style={styles.completeButtonText}>Complete Order</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </View>
     </Modal>
@@ -284,6 +299,28 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     marginBottom: 4,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  actionContainer: {
+    paddingHorizontal: 24,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+    backgroundColor: '#ffffff',
+  },
+  completeButton: {
+    backgroundColor: '#10b981',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  completeButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#ffffff',
+    letterSpacing: 0.3,
   },
   descriptionContainer: {
     marginTop: 8,
