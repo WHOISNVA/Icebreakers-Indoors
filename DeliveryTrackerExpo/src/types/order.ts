@@ -24,5 +24,7 @@ export interface Order {
   origin: GeoPoint;
   currentLocation?: GeoPoint | null;
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  locationDescription?: string;
+  currentLocationDescription?: string;
 }
 

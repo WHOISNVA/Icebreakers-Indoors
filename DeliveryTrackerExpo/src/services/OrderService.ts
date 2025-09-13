@@ -23,7 +23,7 @@ export class OrderService {
     for (const l of this.listeners) l(this.orders);
   }
 
-  async createOrder(items: OrderItem[]): Promise<Order> {
+  async createOrder(items: OrderItem[], locationDescription?: string): Promise<Order> {
     // Request precise location for the order origin
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
@@ -53,6 +53,7 @@ export class OrderService {
       createdAt: Date.now(),
       origin,
       status: 'pending',
+      locationDescription,
     };
 
     this.orders = [order, ...this.orders];
@@ -61,7 +62,7 @@ export class OrderService {
     return order;
   }
 
-  async updateOrderLocation(id: string): Promise<Order | null> {
+  async updateOrderLocation(id: string, locationDescription?: string): Promise<Order | null> {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
       throw new Error('Location permission not granted');
@@ -81,7 +82,11 @@ export class OrderService {
     let updated: Order | null = null;
     this.orders = this.orders.map(o => {
       if (o.id === id) {
-        updated = { ...o, currentLocation: point };
+        updated = { 
+          ...o, 
+          currentLocation: point,
+          currentLocationDescription: locationDescription 
+        };
         return updated;
       }
       return o;
