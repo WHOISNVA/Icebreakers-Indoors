@@ -23,6 +23,7 @@ export interface Order {
   createdAt: number;
   origin: GeoPoint;
   currentLocation?: GeoPoint | null;
+  detailsNote?: string | null;
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
 }
 

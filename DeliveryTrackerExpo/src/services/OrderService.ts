@@ -1,4 +1,6 @@
 import * as Location from 'expo-location';
+import { ref, push, set, onValue, update, remove, DataSnapshot } from 'firebase/database';
+import { database } from '../config/firebase';
 import { Order, OrderItem, GeoPoint } from '../types/order';
 
 function generateId(prefix: string = 'ord'): string {
@@ -7,20 +9,28 @@ function generateId(prefix: string = 'ord'): string {
 }
 
 export class OrderService {
-  private orders: Order[] = [];
   private listeners: Array<(orders: Order[]) => void> = [];
   private lastCreatedId: string | null = null;
+  private ordersRef = ref(database, 'orders');
 
   subscribe(listener: (orders: Order[]) => void): () => void {
     this.listeners.push(listener);
-    listener(this.orders);
+    
+    // Listen to Firebase changes
+    const unsubscribe = onValue(this.ordersRef, (snapshot: DataSnapshot) => {
+      const orders: Order[] = [];
+      snapshot.forEach((childSnapshot) => {
+        orders.push(childSnapshot.val());
+      });
+      // Sort by creation time (newest first)
+      orders.sort((a, b) => b.createdAt - a.createdAt);
+      listener(orders);
+    });
+
     return () => {
       this.listeners = this.listeners.filter(l => l !== listener);
+      unsubscribe();
     };
-  }
-
-  private emit(): void {
-    for (const l of this.listeners) l(this.orders);
   }
 
   async createOrder(items: OrderItem[]): Promise<Order> {
@@ -55,13 +65,15 @@ export class OrderService {
       status: 'pending',
     };
 
-    this.orders = [order, ...this.orders];
+    // Save to Firebase
+    const orderRef = ref(database, `orders/${order.id}`);
+    await set(orderRef, order);
+    
     this.lastCreatedId = order.id;
-    this.emit();
     return order;
   }
 
-  async updateOrderLocation(id: string): Promise<Order | null> {
+  async updateOrderLocation(id: string, detailsNote?: string | null): Promise<Order | null> {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
       throw new Error('Location permission not granted');
@@ -78,26 +90,26 @@ export class OrderService {
       timestamp: pos.timestamp,
     };
 
-    let updated: Order | null = null;
-    this.orders = this.orders.map(o => {
-      if (o.id === id) {
-        updated = { ...o, currentLocation: point };
-        return updated;
-      }
-      return o;
-    });
-    this.emit();
-    return updated;
+    // Update in Firebase
+    const orderRef = ref(database, `orders/${id}`);
+    const updates: Partial<Order> = {
+      currentLocation: point,
+    };
+    if (detailsNote !== undefined) {
+      updates.detailsNote = detailsNote;
+    }
+    
+    await update(orderRef, updates);
+    return null; // Firebase will trigger the listener
   }
 
-  updateStatus(id: string, status: Order['status']): void {
-    this.orders = this.orders.map(o => (o.id === id ? { ...o, status } : o));
-    this.emit();
+  async updateStatus(id: string, status: Order['status']): Promise<void> {
+    const orderRef = ref(database, `orders/${id}`);
+    await update(orderRef, { status });
   }
 
   getLastOrderId(): string | null {
-    if (this.lastCreatedId) return this.lastCreatedId;
-    return this.orders.length > 0 ? this.orders[0].id : null;
+    return this.lastCreatedId;
   }
 }
 
