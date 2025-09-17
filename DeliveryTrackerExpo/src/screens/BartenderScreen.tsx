@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Linking, RefreshControl } from 'react-native';
 import { orderService } from '../services/OrderService';
 import { Order } from '../types/order';
 import * as Location from 'expo-location';
@@ -15,9 +15,18 @@ export default function BartenderScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [sortBy, setSortBy] = useState<SortOption>('timestamp');
   const [barLocation, setBarLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    return orderService.subscribe(setOrders);
+    return orderService.subscribe((newOrders) => {
+      console.log('Orders updated:', newOrders.length);
+      newOrders.forEach(order => {
+        if (order.currentLocation) {
+          console.log(`Order ${order.id} has current location:`, order.currentLocation);
+        }
+      });
+      setOrders(newOrders);
+    });
   }, []);
 
   useEffect(() => {
@@ -36,8 +45,22 @@ export default function BartenderScreen() {
     getBarLocation();
   }, []);
 
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    // Force a re-subscription to get latest data
+    console.log('Manual refresh triggered');
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
+  }, []);
+
   const openDirections = (o: Order) => {
-    Linking.openURL(mapsUrl(o.origin.latitude, o.origin.longitude)).catch(() => {});
+    // Use current location if available, otherwise use origin
+    const location = o.currentLocation || o.origin;
+    console.log('Opening directions for order:', o.id);
+    console.log('Using location:', location);
+    console.log('Current location available:', !!o.currentLocation);
+    Linking.openURL(mapsUrl(location.latitude, location.longitude)).catch(() => {});
   };
 
   const pending = useMemo(() => {
@@ -47,8 +70,11 @@ export default function BartenderScreen() {
       return filtered.sort((a, b) => b.createdAt - a.createdAt); // newest first
     } else if (sortBy === 'proximity' && barLocation) {
       return filtered.sort((a, b) => {
-        const distA = calculateDistance(barLocation, a.origin);
-        const distB = calculateDistance(barLocation, b.origin);
+        // Use current location if available, otherwise use origin
+        const locationA = a.currentLocation || a.origin;
+        const locationB = b.currentLocation || b.origin;
+        const distA = calculateDistance(barLocation, locationA);
+        const distB = calculateDistance(barLocation, locationB);
         return distA - distB; // closest first
       });
     }
@@ -58,7 +84,7 @@ export default function BartenderScreen() {
   const completed = useMemo(() => orders.filter(o => o.status === 'completed'), [orders]);
 
   const renderOrder = ({ item }: { item: Order }) => (
-    <View style={styles.card}>
+    <View style={styles.card} key={`${item.id}-${item.currentLocation?.timestamp || 'origin'}`}>
       <Text style={styles.orderId}>Order {item.id}</Text>
       <Text style={styles.meta}>Time: {new Date(item.createdAt).toLocaleTimeString()}</Text>
       <Text style={styles.meta}>
@@ -69,6 +95,7 @@ export default function BartenderScreen() {
         <Text style={styles.meta}>
           Current: {item.currentLocation.latitude.toFixed(6)}, {item.currentLocation.longitude.toFixed(6)}
           {item.currentLocation.accuracy ? ` (±${Math.round(item.currentLocation.accuracy)}m)` : ''}
+          {item.currentLocation.timestamp && ` @ ${new Date(item.currentLocation.timestamp).toLocaleTimeString()}`}
         </Text>
       )}
       <View style={styles.items}>
@@ -82,14 +109,15 @@ export default function BartenderScreen() {
         <Text style={styles.note}>Note: {item.detailsNote}</Text>
       ) : null}
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.btn} onPress={() => openDirections(item)}>
-          <Text style={styles.btnText}>Directions</Text>
+        <TouchableOpacity 
+          style={styles.btn} 
+          onPress={() => openDirections(item)}
+          key={`btn-${item.id}-${item.currentLocation?.timestamp || 'origin'}`}
+        >
+          <Text style={styles.btnText}>
+            {item.currentLocation ? 'Directions (Updated)' : 'Directions'}
+          </Text>
         </TouchableOpacity>
-        {item.currentLocation && (
-          <TouchableOpacity style={styles.btn} onPress={() => Linking.openURL(mapsUrl(item.currentLocation!.latitude, item.currentLocation!.longitude)).catch(() => {})}>
-            <Text style={styles.btnText}>Current</Text>
-          </TouchableOpacity>
-        )}
         <TouchableOpacity style={[styles.btn, styles.secondary]} onPress={() => orderService.updateStatus(item.id, 'completed')}>
           <Text style={[styles.btnText, styles.secondaryText]}>Mark Completed</Text>
         </TouchableOpacity>
@@ -116,7 +144,16 @@ export default function BartenderScreen() {
         </TouchableOpacity>
       </View>
       
-      <FlatList data={pending} keyExtractor={o => o.id} renderItem={renderOrder} ItemSeparatorComponent={() => <View style={styles.sep} />} ListEmptyComponent={<Text style={styles.empty}>No active orders</Text>} />
+      <FlatList 
+        data={pending} 
+        keyExtractor={o => o.id} 
+        renderItem={renderOrder} 
+        ItemSeparatorComponent={() => <View style={styles.sep} />} 
+        ListEmptyComponent={<Text style={styles.empty}>No active orders</Text>}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      />
 
       {completed.length > 0 && (
         <>
