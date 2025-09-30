@@ -59,6 +59,11 @@
           "googleMapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ae7654f4-c762-4bf1-aa51-4372c2d7ccc3"
+      }
+    }
   }
 }
