@@ -10,6 +10,9 @@ import {
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import LocationService, { LocationData } from '../services/LocationService';
+import LiveLocationService, { LiveLocationData } from '../services/LiveLocationService';
+import PingService, { PingData } from '../services/PingService';
+import MapMatchingService, { MatchedLocation } from '../services/MapMatchingService';
 import { DeliveryStatus, MapRegion } from '../types';
 import { MAP_CONFIG } from '../config/maps';
 import { formatLocation, formatDistance, formatSpeed, isValidLocation } from '../utils/locationUtils';
@@ -30,12 +33,18 @@ const DeliveryTracker: React.FC = () => {
     latitudeDelta: MAP_CONFIG.LATITUDE_DELTA,
     longitudeDelta: MAP_CONFIG.LONGITUDE_DELTA,
   });
+  
+  // New state for enhanced features
+  const [isSharingLocation, setIsSharingLocation] = useState(false);
+  const [liveLocation, setLiveLocation] = useState<LiveLocationData | null>(null);
+  const [matchedLocation, setMatchedLocation] = useState<MatchedLocation | null>(null);
+  const [isPingEnabled, setIsPingEnabled] = useState(false);
 
   const mapRef = useRef<MapView>(null);
 
   useEffect(() => {
     // Initialize with a sample delivery
-    setDeliveryStatus({
+    const sampleDelivery: DeliveryStatus = {
       id: 'delivery-001',
       status: 'pending',
       startTime: new Date(),
@@ -43,17 +52,36 @@ const DeliveryTracker: React.FC = () => {
       customerName: 'John Doe',
       customerPhone: '+1 (555) 123-4567',
       notes: 'Leave at front door if no answer',
-    });
+    };
+    
+    setDeliveryStatus(sampleDelivery);
+    
+    // Set up ping service
+    PingService.setCurrentUserId('user-123');
+    
+    // Subscribe to ping notifications for this delivery
+    PingService.subscribeToPings(
+      sampleDelivery.id,
+      (ping: PingData) => {
+        console.log('Ping received:', ping);
+        Alert.alert('Ping Received!', `Bartender is looking for you at ${ping.message}`);
+      },
+      (error) => {
+        console.error('Ping subscription error:', error);
+      }
+    );
 
     return () => {
       LocationService.stopTracking();
+      LiveLocationService.stopSharing();
+      PingService.unsubscribeFromPings(sampleDelivery.id);
     };
   }, []);
 
   const startDelivery = async () => {
     try {
       const success = await LocationService.startTracking(
-        (location: LocationData) => {
+        async (location: LocationData) => {
           setCurrentLocation(location);
           setMapRegion({
             latitude: location.latitude,
@@ -61,6 +89,29 @@ const DeliveryTracker: React.FC = () => {
             latitudeDelta: LATITUDE_DELTA,
             longitudeDelta: LONGITUDE_DELTA,
           });
+
+          // Apply map matching
+          const matched = MapMatchingService.matchLocation(location);
+          setMatchedLocation(matched);
+
+          // Start live location sharing
+          if (deliveryStatus && !isSharingLocation) {
+            const liveSharingSuccess = await LiveLocationService.startSharing(
+              'user-123', // Current user ID
+              deliveryStatus.id,
+              location,
+              5000 // Update every 5 seconds
+            );
+            
+            if (liveSharingSuccess) {
+              setIsSharingLocation(true);
+            }
+          }
+
+          // Update live location if already sharing
+          if (isSharingLocation) {
+            await LiveLocationService.updateLocation(location);
+          }
 
           // Update delivery status with current location
           if (deliveryStatus) {
@@ -84,7 +135,8 @@ const DeliveryTracker: React.FC = () => {
 
       if (success) {
         setIsTracking(true);
-        Alert.alert('Delivery Started', 'Location tracking has been enabled for this delivery.');
+        setIsPingEnabled(true);
+        Alert.alert('Delivery Started', 'Location tracking and live sharing have been enabled for this delivery.');
       } else {
         Alert.alert('Error', 'Failed to start location tracking. Please check permissions.');
       }
@@ -94,10 +146,15 @@ const DeliveryTracker: React.FC = () => {
     }
   };
 
-  const stopDelivery = () => {
+  const stopDelivery = async () => {
     LocationService.stopTracking();
+    await LiveLocationService.stopSharing();
+    
     setIsTracking(false);
+    setIsSharingLocation(false);
+    setIsPingEnabled(false);
     setCurrentLocation(null);
+    setMatchedLocation(null);
     
     if (deliveryStatus) {
       setDeliveryStatus(prev => prev ? {
@@ -107,12 +164,37 @@ const DeliveryTracker: React.FC = () => {
       } : null);
     }
     
-    Alert.alert('Delivery Completed', 'Location tracking has been stopped.');
+    Alert.alert('Delivery Completed', 'Location tracking and live sharing have been stopped.');
+  };
+
+  const sendPing = async () => {
+    if (!deliveryStatus || !isPingEnabled) {
+      Alert.alert('Error', 'Cannot send ping. Delivery not active.');
+      return;
+    }
+
+    try {
+      const success = await PingService.sendPing(
+        deliveryStatus.id,
+        'bartender-456', // Target bartender ID
+        'Find my guest - I need help locating you!'
+      );
+
+      if (success) {
+        Alert.alert('Ping Sent', 'The bartender has been notified to help locate you.');
+      } else {
+        Alert.alert('Error', 'Failed to send ping. Please try again.');
+      }
+    } catch (error) {
+      console.error('Send ping error:', error);
+      Alert.alert('Error', 'Failed to send ping.');
+    }
   };
 
   const getCurrentLocation = async () => {
     try {
-      const location = await LocationService.getCurrentLocation();
+      // Use enhanced location that combines GPS, WiFi, and cell signals
+      const location = await LocationService.getEnhancedLocation();
       if (location) {
         setCurrentLocation(location);
         setMapRegion({
@@ -121,6 +203,10 @@ const DeliveryTracker: React.FC = () => {
           latitudeDelta: LATITUDE_DELTA,
           longitudeDelta: LONGITUDE_DELTA,
         });
+        
+        // Apply map matching
+        const matched = MapMatchingService.matchLocation(location);
+        setMatchedLocation(matched);
         
         if (mapRef.current) {
           mapRef.current.animateToRegion({
@@ -224,8 +310,37 @@ const DeliveryTracker: React.FC = () => {
               Speed: {formatSpeed(currentLocation.speed)}
             </Text>
           )}
+          {matchedLocation && matchedLocation.isMatched && (
+            <Text style={[styles.locationText, styles.zoneText]}>
+              Zone: {matchedLocation.matchedZone?.name}
+            </Text>
+          )}
         </View>
       )}
+
+      {/* Enhanced Features Status */}
+      <View style={styles.featuresStatus}>
+        <View style={styles.featureItem}>
+          <Text style={styles.featureLabel}>Live Sharing:</Text>
+          <Text style={[styles.featureValue, { color: isSharingLocation ? '#34C759' : '#FF3B30' }]}>
+            {isSharingLocation ? 'Active' : 'Inactive'}
+          </Text>
+        </View>
+        <View style={styles.featureItem}>
+          <Text style={styles.featureLabel}>Ping:</Text>
+          <Text style={[styles.featureValue, { color: isPingEnabled ? '#34C759' : '#FF3B30' }]}>
+            {isPingEnabled ? 'Enabled' : 'Disabled'}
+          </Text>
+        </View>
+        {matchedLocation && matchedLocation.isMatched && (
+          <View style={styles.featureItem}>
+            <Text style={styles.featureLabel}>Zone Match:</Text>
+            <Text style={[styles.featureValue, { color: '#007AFF' }]}>
+              {matchedLocation.confidence > 0.8 ? 'High' : 'Medium'}
+            </Text>
+          </View>
+        )}
+      </View>
 
       {/* Controls */}
       <View style={styles.controls}>
@@ -256,6 +371,20 @@ const DeliveryTracker: React.FC = () => {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Ping Button */}
+      {isPingEnabled && (
+        <View style={styles.pingContainer}>
+          <TouchableOpacity
+            style={[styles.button, styles.pingButton]}
+            onPress={sendPing}
+          >
+            <Text style={[styles.buttonText, styles.pingButtonText]}>
+              🔔 Ping Bartender
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };
@@ -351,6 +480,43 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#8E8E93',
     textAlign: 'center',
+  },
+  zoneText: {
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  featuresStatus: {
+    backgroundColor: '#FFFFFF',
+    padding: 15,
+    marginHorizontal: 20,
+    marginBottom: 10,
+    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  featureItem: {
+    alignItems: 'center',
+  },
+  featureLabel: {
+    fontSize: 12,
+    color: '#8E8E93',
+    marginBottom: 4,
+  },
+  featureValue: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pingContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+  },
+  pingButton: {
+    backgroundColor: '#FF9500',
+  },
+  pingButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   controls: {
     flexDirection: 'row',

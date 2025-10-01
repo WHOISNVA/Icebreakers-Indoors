@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Linking, Alert } from 'react-native';
 import { orderService } from '../services/OrderService';
 import { Order } from '../types/order';
 import * as Location from 'expo-location';
+import PingService from '../services/PingService';
 
 function mapsUrl(lat: number, lng: number): string {
   const q = `${lat},${lng}`;
@@ -17,6 +18,9 @@ export default function BartenderScreen() {
   const [barLocation, setBarLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   useEffect(() => {
+    // Set bartender user ID for ping service
+    PingService.setCurrentUserId('bartender-123');
+    
     return orderService.subscribe(setOrders);
   }, []);
 
@@ -38,6 +42,25 @@ export default function BartenderScreen() {
 
   const openDirections = (o: Order) => {
     Linking.openURL(mapsUrl(o.origin.latitude, o.origin.longitude)).catch(() => {});
+  };
+
+  const sendPingToCustomer = async (orderId: string) => {
+    try {
+      const success = await PingService.sendPing(
+        orderId,
+        'user-123', // Customer user ID
+        'Your order is ready! Come pick it up at the bar.'
+      );
+
+      if (success) {
+        Alert.alert('Ping Sent', 'The customer has been notified that their order is ready.');
+      } else {
+        Alert.alert('Error', 'Failed to send ping.');
+      }
+    } catch (error) {
+      console.error('Send ping error:', error);
+      Alert.alert('Error', 'Failed to send ping.');
+    }
   };
 
   const pending = useMemo(() => {
@@ -90,6 +113,9 @@ export default function BartenderScreen() {
             <Text style={styles.btnText}>Current</Text>
           </TouchableOpacity>
         )}
+        <TouchableOpacity style={[styles.btn, styles.ping]} onPress={() => sendPingToCustomer(item.id)}>
+          <Text style={styles.btnText}>🔔 Ping Customer</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={[styles.btn, styles.secondary]} onPress={() => orderService.updateStatus(item.id, 'completed')}>
           <Text style={[styles.btnText, styles.secondaryText]}>Mark Completed</Text>
         </TouchableOpacity>
@@ -164,9 +190,10 @@ const styles = StyleSheet.create({
   meta: { color: '#3C3C43', marginBottom: 2 },
   items: { marginTop: 8 },
   item: { color: '#1C1C1E' },
-  actions: { flexDirection: 'row', marginTop: 12, gap: 12 },
+  actions: { flexDirection: 'row', marginTop: 12, gap: 12, flexWrap: 'wrap' },
   btn: { backgroundColor: '#007AFF', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
   btnText: { color: '#fff', fontWeight: '700' },
+  ping: { backgroundColor: '#FF9500' },
   secondary: { backgroundColor: '#F2F2F7', borderWidth: 1, borderColor: '#C7C7CC' },
   secondaryText: { color: '#1C1C1E' },
   note: { marginTop: 8, color: '#1C1C1E' },

@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, FlatList, TextInput, Modal } from 'react-native';
 import { orderService } from '../services/OrderService';
 import { OrderItem } from '../types/order';
+import PingService from '../services/PingService';
 
 const MENU: Array<{ id: string; name: string }> = [
   { id: 'beer', name: 'Beer' },
@@ -15,6 +16,28 @@ export default function UserScreen() {
   const [lastOrderId, setLastOrderId] = useState<string | null>(null);
   const [details, setDetails] = useState<string>('');
   const [showDetailsModal, setShowDetailsModal] = useState<boolean>(false);
+
+  // Set user ID and subscribe to pings
+  useEffect(() => {
+    PingService.setCurrentUserId('user-123');
+
+    // Subscribe to pings for the last order
+    if (lastOrderId) {
+      PingService.subscribeToPings(
+        lastOrderId,
+        (ping) => {
+          console.log('Ping received:', ping);
+        },
+        (error) => {
+          console.error('Ping subscription error:', error);
+        }
+      );
+
+      return () => {
+        PingService.unsubscribeFromPings(lastOrderId);
+      };
+    }
+  }, [lastOrderId]);
 
   const items: OrderItem[] = useMemo(
     () =>
