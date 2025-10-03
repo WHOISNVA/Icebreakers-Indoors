@@ -6,7 +6,7 @@ import { Order } from '../types/order';
 import * as Location from 'expo-location';
 import PingService from '../services/PingService';
 import DeliveryTrackingService from '../services/DeliveryTrackingService';
-import { formatDistance, formatFloor } from '../utils/locationUtils';
+import { formatDistance, formatFloor, resetBuildingBaseAltitude, getBuildingBaseAltitude, setFloorOffset, getFloorOffset } from '../utils/locationUtils';
 import ARNavigationView from '../components/ARNavigationView';
 
 function mapsUrl(lat: number, lng: number): string {
@@ -21,6 +21,8 @@ export default function BartenderScreen() {
   const [sortBy, setSortBy] = useState<SortOption>('timestamp');
   const [barLocation, setBarLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showCalibration, setShowCalibration] = useState(false);
+  const [showCompletedOrders, setShowCompletedOrders] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [showARView, setShowARView] = useState(false);
   const [deliveryStatus, setDeliveryStatus] = useState<any>(null);
@@ -93,6 +95,53 @@ export default function BartenderScreen() {
       console.error('🔔 BartenderScreen: Error sending ping:', error);
       Alert.alert('Error', 'Failed to send ping.');
     }
+  };
+
+  const handleResetFloorCalibration = () => {
+    const currentBase = getBuildingBaseAltitude();
+    const currentOffset = getFloorOffset();
+    
+    Alert.alert(
+      '🏢 Floor Calibration',
+      currentBase 
+        ? `Base altitude: ${currentBase.toFixed(1)}m\nFloor offset: ${currentOffset > 0 ? '+' : ''}${currentOffset}\n\nWhat would you like to do?`
+        : 'No calibration yet. First order will set the reference.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Set Current Floor',
+          onPress: () => {
+            Alert.prompt(
+              'What floor are you on?',
+              'Enter the current floor number (0 = ground floor)',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Set',
+                  onPress: (value) => {
+                    const floor = parseInt(value || '0', 10);
+                    if (!isNaN(floor)) {
+                      setFloorOffset(floor);
+                      Alert.alert('✅ Floor Set', `Current location is now ${formatFloor(floor)}`);
+                    }
+                  },
+                },
+              ],
+              'plain-text',
+              '3'
+            );
+          },
+        },
+        {
+          text: 'Reset All',
+          style: 'destructive',
+          onPress: () => {
+            resetBuildingBaseAltitude();
+            Alert.alert('✅ Reset Complete', 'Floor calibration cleared. Place a new order to recalibrate.');
+          },
+        },
+      ]
+    );
   };
 
   const openDeliveryMap = (order?: Order) => {
@@ -300,27 +349,51 @@ export default function BartenderScreen() {
         >
           <Text style={[styles.sortText, sortBy === 'proximity' ? styles.sortTextActive : null]}>By Distance</Text>
         </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.calibrateBtn} 
+          onPress={handleResetFloorCalibration}
+        >
+          <Text style={styles.calibrateText}>🏢 Floor Cal.</Text>
+        </TouchableOpacity>
       </View>
       
       <FlatList data={pending} keyExtractor={o => o.id} renderItem={renderOrder} ItemSeparatorComponent={() => <View style={styles.sep} />} ListEmptyComponent={<Text style={styles.empty}>No active orders</Text>} />
 
       {completed.length > 0 && (
         <>
-          <Text style={styles.subTitle}>Completed</Text>
-          <FlatList data={completed} keyExtractor={o => o.id} renderItem={({ item }) => (
-            <View style={[styles.card, styles.completedCard]}>
-              <Text style={styles.orderId}>Order {item.id}</Text>
-              <Text style={styles.meta}>Completed</Text>
-              {item.currentLocation && (
-                <Text style={styles.meta}>
-                  Last Known: {item.currentLocation.latitude.toFixed(6)}, {item.currentLocation.longitude.toFixed(6)}
-                </Text>
-              )}
-              {item.detailsNote ? (
-                <Text style={styles.note}>Note: {item.detailsNote}</Text>
-              ) : null}
-            </View>
-          )} ItemSeparatorComponent={() => <View style={styles.sep} />} />
+          <TouchableOpacity 
+            style={styles.completedHeader} 
+            onPress={() => setShowCompletedOrders(!showCompletedOrders)}
+          >
+            <Text style={styles.subTitle}>
+              {showCompletedOrders ? '▼' : '▶'} Completed ({completed.length})
+            </Text>
+            <Text style={styles.completedToggleHint}>
+              {showCompletedOrders ? 'Tap to hide' : 'Tap to view'}
+            </Text>
+          </TouchableOpacity>
+          
+          {showCompletedOrders && (
+            <FlatList 
+              data={completed} 
+              keyExtractor={o => o.id} 
+              renderItem={({ item }) => (
+                <View style={[styles.card, styles.completedCard]}>
+                  <Text style={styles.orderId}>Order {item.id}</Text>
+                  <Text style={styles.meta}>Completed at {new Date(item.createdAt).toLocaleTimeString()}</Text>
+                  {item.currentLocation && (
+                    <Text style={styles.meta}>
+                      Last Known: {item.currentLocation.latitude.toFixed(6)}, {item.currentLocation.longitude.toFixed(6)}
+                    </Text>
+                  )}
+                  {item.detailsNote ? (
+                    <Text style={styles.note}>Note: {item.detailsNote}</Text>
+                  ) : null}
+                </View>
+              )} 
+              ItemSeparatorComponent={() => <View style={styles.sep} />} 
+            />
+          )}
         </>
       )}
 
@@ -554,12 +627,30 @@ const styles = StyleSheet.create({
   secondaryText: { color: '#1C1C1E' },
   note: { marginTop: 8, color: '#1C1C1E' },
   subTitle: { fontSize: 18, fontWeight: '700', paddingHorizontal: 16, marginTop: 16, marginBottom: 8 },
+  completedHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 16,
+    backgroundColor: '#F2F2F7',
+    borderTopWidth: 1,
+    borderTopColor: '#C7C7CC',
+  },
+  completedToggleHint: {
+    fontSize: 14,
+    color: '#8E8E93',
+    fontWeight: '500',
+  },
   empty: { color: '#8E8E93', paddingHorizontal: 16, paddingVertical: 12 },
   sortContainer: { flexDirection: 'row', paddingHorizontal: 16, marginBottom: 12, gap: 8 },
   sortBtn: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, backgroundColor: '#F2F2F7', borderWidth: 1, borderColor: '#C7C7CC' },
   sortActive: { backgroundColor: '#007AFF' },
   sortText: { fontSize: 14, fontWeight: '600', color: '#1C1C1E' },
   sortTextActive: { color: '#FFFFFF' },
+  calibrateBtn: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, backgroundColor: '#FF9500', borderWidth: 1, borderColor: '#FF9500' },
+  calibrateText: { fontSize: 14, fontWeight: '600', color: '#FFFFFF' },
   // Map Modal Styles
   mapContainer: { flex: 1, backgroundColor: '#fff' },
   map: { flex: 1 },

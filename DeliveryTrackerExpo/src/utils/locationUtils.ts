@@ -221,17 +221,75 @@ export function angleDifference(angle1: number, angle2: number): number {
 }
 
 /**
+ * Building base altitude storage
+ * This gets set to the altitude of the first order placed (assumed to be ground reference)
+ */
+let buildingBaseAltitude: number | null = null;
+let floorOffset: number = 0; // Manual floor offset adjustment
+
+/**
+ * Set the building's base altitude (ground floor reference)
+ */
+export function setBuildingBaseAltitude(altitude: number): void {
+  if (buildingBaseAltitude === null) {
+    buildingBaseAltitude = altitude;
+    console.log(`🏢 Building base altitude set to ${altitude.toFixed(1)}m`);
+  }
+}
+
+/**
+ * Set manual floor offset (e.g., if first order was on 3rd floor, set offset to -3)
+ */
+export function setFloorOffset(offset: number): void {
+  floorOffset = offset;
+  console.log(`🏢 Floor offset set to ${offset} floors`);
+}
+
+/**
+ * Get the current floor offset
+ */
+export function getFloorOffset(): number {
+  return floorOffset;
+}
+
+/**
+ * Reset the building base altitude (for testing or changing venues)
+ */
+export function resetBuildingBaseAltitude(): void {
+  buildingBaseAltitude = null;
+  floorOffset = 0;
+  console.log('🏢 Building base altitude and floor offset reset');
+}
+
+/**
+ * Get the current building base altitude
+ */
+export function getBuildingBaseAltitude(): number | null {
+  return buildingBaseAltitude;
+}
+
+/**
  * Estimate floor number from altitude
  * Assumes ~3 meters (10 feet) per floor
  * Ground floor = 0, First floor = 1, etc.
+ * 
+ * Uses the building's base altitude as reference if available
  */
 export function estimateFloor(altitude: number, groundAltitude?: number): number {
-  const METERS_PER_FLOOR = 3; // Average floor height
-  const baseAltitude = groundAltitude ?? 0;
+  const METERS_PER_FLOOR = 3.5; // Average floor height (slightly increased for accuracy)
+  
+  // Use provided groundAltitude, or fall back to stored building base, or assume 0
+  const baseAltitude = groundAltitude ?? buildingBaseAltitude ?? 0;
   const relativeAltitude = altitude - baseAltitude;
   
   // Round to nearest floor
-  return Math.max(0, Math.round(relativeAltitude / METERS_PER_FLOOR));
+  const calculatedFloor = Math.round(relativeAltitude / METERS_PER_FLOOR);
+  
+  // Apply manual floor offset (e.g., if calibrated on 3rd floor, offset = +3)
+  const floor = calculatedFloor + floorOffset;
+  
+  // Clamp to reasonable range (0-100 floors)
+  return Math.max(0, Math.min(100, floor));
 }
 
 /**

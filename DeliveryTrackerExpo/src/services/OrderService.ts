@@ -2,7 +2,7 @@ import * as Location from 'expo-location';
 import { ref, push, set, onValue, update, remove, DataSnapshot } from 'firebase/database';
 import { database } from '../config/firebase';
 import { Order, OrderItem, GeoPoint } from '../types/order';
-import { estimateFloor } from '../utils/locationUtils';
+import { estimateFloor, setBuildingBaseAltitude } from '../utils/locationUtils';
 
 function generateId(prefix: string = 'ord'): string {
   const random = Math.random().toString(36).slice(2, 10);
@@ -46,6 +46,11 @@ export class OrderService {
       accuracy: Location.Accuracy.BestForNavigation,
       mayShowUserSettingsDialog: true,
     });
+
+    // Set building base altitude on first order (for floor calculation)
+    if (pos.coords.altitude) {
+      setBuildingBaseAltitude(pos.coords.altitude);
+    }
 
     const origin: GeoPoint = {
       latitude: pos.coords.latitude,
