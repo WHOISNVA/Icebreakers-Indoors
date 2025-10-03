@@ -1,6 +1,8 @@
 import { database } from '../config/firebase';
 import { ref, set, onValue, off, remove } from 'firebase/database';
-import { Vibration, Alert, Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
+import { Audio } from 'expo-av';
+import * as Haptics from 'expo-haptics';
 
 export interface PingData {
   orderId: string;
@@ -20,6 +22,8 @@ export interface PingSubscription {
 class PingService {
   private subscriptions: Map<string, PingSubscription> = new Map();
   private currentUserId: string | null = null;
+  private sound: Audio.Sound | null = null;
+  private audioInitialized: boolean = false;
 
   /**
    * Set the current user ID for ping operations
@@ -121,15 +125,77 @@ class PingService {
   }
 
   /**
+   * Initialize audio for notifications
+   */
+  private async initializeAudio(): Promise<void> {
+    if (this.audioInitialized) return;
+
+    try {
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+      });
+      this.audioInitialized = true;
+    } catch (error) {
+      console.error('Failed to initialize audio:', error);
+    }
+  }
+
+  /**
+   * Play notification - SUPER STRONG haptic pattern (iOS Taptic Engine)
+   * This creates an unmistakable notification pattern
+   */
+  private async playNotificationSound(): Promise<void> {
+    try {
+      console.log('🔔 Playing STRONG notification pattern...');
+      
+      // Ultra-strong 5-burst pattern
+      // Each burst has 3 different haptic types for maximum effect
+      for (let burst = 0; burst < 5; burst++) {
+        // Triple-tap haptic burst
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        await new Promise(resolve => setTimeout(resolve, 80));
+        
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+        await new Promise(resolve => setTimeout(resolve, 80));
+        
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        
+        // Pause between bursts
+        await new Promise(resolve => setTimeout(resolve, 400));
+      }
+
+      console.log('✅ Notification pattern completed');
+    } catch (error) {
+      console.error('Failed to play notification:', error);
+      // Fallback to basic haptics
+      await this.triggerHapticFeedback();
+    }
+  }
+
+  /**
+   * Trigger haptic feedback - STRONG pattern
+   */
+  private async triggerHapticFeedback(): Promise<void> {
+    try {
+      // iOS STRONG warning pattern (more noticeable)
+      for (let i = 0; i < 4; i++) {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+    } catch (error) {
+      console.error('Failed to trigger haptic feedback:', error);
+    }
+  }
+
+  /**
    * Trigger ping notification on the device
    */
-  private triggerPingNotification(ping: PingData): void {
-    // Vibrate the device
-    if (Platform.OS === 'ios') {
-      Vibration.vibrate([0, 500, 200, 500, 200, 500]);
-    } else {
-      Vibration.vibrate([0, 500, 200, 500, 200, 500]);
-    }
+  private async triggerPingNotification(ping: PingData): Promise<void> {
+    console.log('🔔 Ping notification triggered:', ping);
+
+    // Play sound with haptics
+    await this.playNotificationSound();
 
     // Show alert
     Alert.alert(
@@ -137,16 +203,14 @@ class PingService {
       `${ping.message}\n\nYour order is ready for pickup!`,
       [
         {
-          text: 'OK',
+          text: 'Got it!',
           onPress: () => {
-            console.log('Ping acknowledged');
+            console.log('Ping acknowledged by user');
           },
         },
       ],
       { cancelable: false }
     );
-
-    console.log('Ping notification triggered:', ping);
   }
 
   /**
@@ -177,11 +241,21 @@ class PingService {
   /**
    * Clean up all subscriptions
    */
-  public cleanup(): void {
+  public async cleanup(): Promise<void> {
     this.subscriptions.forEach((subscription, orderId) => {
       this.unsubscribeFromPings(orderId);
     });
     this.subscriptions.clear();
+
+    // Clean up audio
+    if (this.sound) {
+      try {
+        await this.sound.unloadAsync();
+      } catch (error) {
+        console.error('Failed to unload sound:', error);
+      }
+      this.sound = null;
+    }
   }
 }
 

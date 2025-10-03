@@ -220,3 +220,56 @@ export function angleDifference(angle1: number, angle2: number): number {
   return diff > 180 ? 360 - diff : diff;
 }
 
+/**
+ * Estimate floor number from altitude
+ * Assumes ~3 meters (10 feet) per floor
+ * Ground floor = 0, First floor = 1, etc.
+ */
+export function estimateFloor(altitude: number, groundAltitude?: number): number {
+  const METERS_PER_FLOOR = 3; // Average floor height
+  const baseAltitude = groundAltitude ?? 0;
+  const relativeAltitude = altitude - baseAltitude;
+  
+  // Round to nearest floor
+  return Math.max(0, Math.round(relativeAltitude / METERS_PER_FLOOR));
+}
+
+/**
+ * Format floor number for display
+ */
+export function formatFloor(floor: number): string {
+  if (floor === 0) return 'Ground Floor';
+  if (floor === 1) return '1st Floor';
+  if (floor === 2) return '2nd Floor';
+  if (floor === 3) return '3rd Floor';
+  return `${floor}th Floor`;
+}
+
+/**
+ * Calculate vertical distance between two altitudes
+ */
+export function calculateVerticalDistance(altitude1: number, altitude2: number): number {
+  return Math.abs(altitude2 - altitude1);
+}
+
+/**
+ * Calculate 3D distance (including altitude)
+ */
+export function calculate3DDistance(
+  lat1: number,
+  lon1: number,
+  alt1: number,
+  lat2: number,
+  lon2: number,
+  alt2: number
+): number {
+  // Calculate horizontal distance
+  const horizontalDistance = calculateDistance(lat1, lon1, lat2, lon2);
+  
+  // Calculate vertical distance
+  const verticalDistance = calculateVerticalDistance(alt1, alt2);
+  
+  // Use Pythagorean theorem for 3D distance
+  return Math.sqrt(horizontalDistance ** 2 + verticalDistance ** 2);
+}
+

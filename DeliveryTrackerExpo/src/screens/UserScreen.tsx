@@ -19,23 +19,29 @@ export default function UserScreen() {
 
   // Set user ID and subscribe to pings
   useEffect(() => {
+    console.log('🔔 UserScreen: Setting up PingService for user-123');
     PingService.setCurrentUserId('user-123');
 
     // Subscribe to pings for the last order
     if (lastOrderId) {
+      console.log(`🔔 UserScreen: Subscribing to pings for order: ${lastOrderId}`);
       PingService.subscribeToPings(
         lastOrderId,
         (ping) => {
-          console.log('Ping received:', ping);
+          console.log('🔔 UserScreen: Ping received!', ping);
+          Alert.alert('Ping Debug', `Received ping from ${ping.fromUserId} for order ${ping.orderId}`);
         },
         (error) => {
-          console.error('Ping subscription error:', error);
+          console.error('🔔 UserScreen: Ping subscription error:', error);
         }
       );
 
       return () => {
+        console.log(`🔔 UserScreen: Unsubscribing from pings for order: ${lastOrderId}`);
         PingService.unsubscribeFromPings(lastOrderId);
       };
+    } else {
+      console.log('🔔 UserScreen: No lastOrderId yet, waiting for order...');
     }
   }, [lastOrderId]);
 

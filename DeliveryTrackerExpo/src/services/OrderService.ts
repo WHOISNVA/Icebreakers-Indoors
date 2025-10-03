@@ -2,6 +2,7 @@ import * as Location from 'expo-location';
 import { ref, push, set, onValue, update, remove, DataSnapshot } from 'firebase/database';
 import { database } from '../config/firebase';
 import { Order, OrderItem, GeoPoint } from '../types/order';
+import { estimateFloor } from '../utils/locationUtils';
 
 function generateId(prefix: string = 'ord'): string {
   const random = Math.random().toString(36).slice(2, 10);
@@ -52,6 +53,7 @@ export class OrderService {
       accuracy: pos.coords.accuracy ?? null,
       altitude: pos.coords.altitude ?? null,
       altitudeAccuracy: pos.coords.altitudeAccuracy ?? null,
+      floor: pos.coords.altitude ? estimateFloor(pos.coords.altitude) : null,
       heading: pos.coords.heading ?? null,
       speed: pos.coords.speed ?? null,
       timestamp: pos.timestamp,
@@ -85,6 +87,7 @@ export class OrderService {
       accuracy: pos.coords.accuracy ?? null,
       altitude: pos.coords.altitude ?? null,
       altitudeAccuracy: pos.coords.altitudeAccuracy ?? null,
+      floor: pos.coords.altitude ? estimateFloor(pos.coords.altitude) : null,
       heading: pos.coords.heading ?? null,
       speed: pos.coords.speed ?? null,
       timestamp: pos.timestamp,

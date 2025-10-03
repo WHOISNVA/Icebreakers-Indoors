@@ -6,6 +6,7 @@ export interface GeoPoint {
   accuracy?: number | null;
   altitude?: number | null;
   altitudeAccuracy?: number | null;
+  floor?: number | null; // Estimated floor number (0 = ground, 1 = first floor, etc.)
   heading?: number | null;
   speed?: number | null;
   timestamp: number;
