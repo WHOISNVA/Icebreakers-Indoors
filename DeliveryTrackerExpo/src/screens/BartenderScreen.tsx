@@ -118,7 +118,7 @@ export default function BartenderScreen() {
                 { text: 'Cancel', style: 'cancel' },
                 {
                   text: 'Set',
-                  onPress: (value) => {
+                  onPress: (value?: string) => {
                     const floor = parseInt(value || '0', 10);
                     if (!isNaN(floor)) {
                       setFloorOffset(floor);

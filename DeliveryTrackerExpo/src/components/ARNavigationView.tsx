@@ -4,6 +4,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 import { Magnetometer } from 'expo-sensors';
 import { calculateDistance, calculateBearing, formatDistance, formatFloor, estimateFloor, calculateVerticalDistance } from '../utils/locationUtils';
+import IndoorAtlasService from '../services/IndoorAtlasService';
 
 interface ARNavigationViewProps {
   targetLatitude: number;
@@ -64,56 +65,67 @@ export default function ARNavigationView({
   // Track current location
   useEffect(() => {
     const startTracking = async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        return;
-      }
+      // Use IndoorAtlas for precise tracking (falls back to GPS automatically)
+      const unsubscribe = await IndoorAtlasService.watchPosition((position) => {
+        // Convert to Location.LocationObject format for compatibility
+        const locationObject: Location.LocationObject = {
+          coords: {
+            latitude: position.latitude,
+            longitude: position.longitude,
+            altitude: position.altitude ?? 0,
+            accuracy: position.accuracy,
+            altitudeAccuracy: null,
+            heading: position.heading ?? 0,
+            speed: null,
+          },
+          timestamp: position.timestamp,
+        };
+        
+        setCurrentLocation(locationObject);
 
-      locationSubscription.current = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.BestForNavigation,
-          timeInterval: 1000,
-          distanceInterval: 1,
-        },
-        (location) => {
-          setCurrentLocation(location);
+        // Calculate distance to target
+        const dist = calculateDistance(
+          position.latitude,
+          position.longitude,
+          targetLatitude,
+          targetLongitude
+        );
+        setDistance(dist);
 
-          // Calculate distance to target
-          const dist = calculateDistance(
-            location.coords.latitude,
-            location.coords.longitude,
-            targetLatitude,
-            targetLongitude
-          );
-          setDistance(dist);
+        // Calculate bearing to target
+        const bear = calculateBearing(
+          position.latitude,
+          position.longitude,
+          targetLatitude,
+          targetLongitude
+        );
+        setBearing(bear);
 
-          // Calculate bearing to target
-          const bear = calculateBearing(
-            location.coords.latitude,
-            location.coords.longitude,
-            targetLatitude,
-            targetLongitude
-          );
-          setBearing(bear);
-
-          // Calculate floor and vertical distance
-          if (location.coords.altitude) {
-            const floor = estimateFloor(location.coords.altitude);
-            setCurrentFloor(floor);
-            
-            if (targetAltitude) {
-              const vertDist = calculateVerticalDistance(location.coords.altitude, targetAltitude);
-              setVerticalDistance(vertDist);
-            }
-          }
-
-          // Check if arrived (within 15 meters horizontally)
-          if (dist <= 15 && !hasArrived) {
-            setHasArrived(true);
-            onArrived?.();
-          }
+        // Floor detection - IndoorAtlas provides this directly!
+        if (position.floor !== null) {
+          setCurrentFloor(position.floor);
+          console.log(`🏢 IndoorAtlas floor: ${position.floor}`);
+        } else if (position.altitude) {
+          const floor = estimateFloor(position.altitude);
+          setCurrentFloor(floor);
         }
-      );
+
+        // Calculate vertical distance
+        if (targetAltitude && position.altitude) {
+          const vertDist = calculateVerticalDistance(position.altitude, targetAltitude);
+          setVerticalDistance(vertDist);
+        }
+
+        // Check if arrived (within 15 meters horizontally)
+        if (dist <= 15 && !hasArrived) {
+          setHasArrived(true);
+          onArrived?.();
+        }
+        
+        console.log(`📍 AR Position: ${position.source} - dist=${dist.toFixed(1)}m, accuracy=${position.accuracy.toFixed(1)}m`);
+      });
+
+      locationSubscription.current = { remove: unsubscribe } as any;
     };
 
     startTracking();

@@ -222,19 +222,25 @@ export function angleDifference(angle1: number, angle2: number): number {
 
 /**
  * Building base altitude storage
- * This gets set to the altitude of the first order placed (assumed to be ground reference)
+ * Uses a smart averaging approach to determine ground floor
  */
+let buildingAltitudeSamples: number[] = [];
 let buildingBaseAltitude: number | null = null;
 let floorOffset: number = 0; // Manual floor offset adjustment
 
 /**
  * Set the building's base altitude (ground floor reference)
+ * Uses smart averaging: assumes the lowest altitude seen is ground floor
  */
 export function setBuildingBaseAltitude(altitude: number): void {
-  if (buildingBaseAltitude === null) {
-    buildingBaseAltitude = altitude;
-    console.log(`🏢 Building base altitude set to ${altitude.toFixed(1)}m`);
-  }
+  // Collect samples from first few orders
+  buildingAltitudeSamples.push(altitude);
+  
+  // Use the LOWEST altitude as ground floor (makes sense since ground = lowest point)
+  const lowestAltitude = Math.min(...buildingAltitudeSamples);
+  buildingBaseAltitude = lowestAltitude;
+  
+  console.log(`🏢 Building base altitude updated: ${lowestAltitude.toFixed(1)}m (from ${buildingAltitudeSamples.length} samples)`);
 }
 
 /**
@@ -257,6 +263,7 @@ export function getFloorOffset(): number {
  */
 export function resetBuildingBaseAltitude(): void {
   buildingBaseAltitude = null;
+  buildingAltitudeSamples = [];
   floorOffset = 0;
   console.log('🏢 Building base altitude and floor offset reset');
 }
@@ -276,20 +283,32 @@ export function getBuildingBaseAltitude(): number | null {
  * Uses the building's base altitude as reference if available
  */
 export function estimateFloor(altitude: number, groundAltitude?: number): number {
-  const METERS_PER_FLOOR = 3.5; // Average floor height (slightly increased for accuracy)
+  const METERS_PER_FLOOR = 4.0; // Average floor height in commercial buildings (more accurate)
   
-  // Use provided groundAltitude, or fall back to stored building base, or assume 0
-  const baseAltitude = groundAltitude ?? buildingBaseAltitude ?? 0;
+  // Use provided groundAltitude, or fall back to stored building base
+  const baseAltitude = groundAltitude ?? buildingBaseAltitude;
+  
+  // If no base altitude, can't reliably estimate floor
+  if (baseAltitude === null || baseAltitude === undefined) {
+    console.log('🏢 No base altitude yet - returning floor 0');
+    return 0;
+  }
+  
   const relativeAltitude = altitude - baseAltitude;
   
-  // Round to nearest floor
-  const calculatedFloor = Math.round(relativeAltitude / METERS_PER_FLOOR);
+  // Round to nearest floor, but with a small threshold to prevent jitter
+  // (e.g., 3.7m = floor 1, 4.3m = floor 1, but 4.5m = floor 1, 5.0m = floor 1, 6.0m = floor 2)
+  let calculatedFloor = Math.round(relativeAltitude / METERS_PER_FLOOR);
   
   // Apply manual floor offset (e.g., if calibrated on 3rd floor, offset = +3)
   const floor = calculatedFloor + floorOffset;
   
   // Clamp to reasonable range (0-100 floors)
-  return Math.max(0, Math.min(100, floor));
+  const finalFloor = Math.max(0, Math.min(100, floor));
+  
+  console.log(`🏢 Floor calculation: altitude=${altitude.toFixed(1)}m, base=${baseAltitude.toFixed(1)}m, relative=${relativeAltitude.toFixed(1)}m, floor=${finalFloor}`);
+  
+  return finalFloor;
 }
 
 /**

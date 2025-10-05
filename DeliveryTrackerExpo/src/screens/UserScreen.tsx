@@ -67,7 +67,9 @@ export default function UserScreen() {
       Alert.alert('No items', 'Please add at least one item.');
       return;
     }
+    
     try {
+      // Order creation now automatically detects floor from altitude
       const order = await orderService.createOrder(items);
       Alert.alert('Order placed', `Order ${order.id} created.`);
       setSelected({});

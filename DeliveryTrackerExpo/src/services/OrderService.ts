@@ -3,6 +3,7 @@ import { ref, push, set, onValue, update, remove, DataSnapshot } from 'firebase/
 import { database } from '../config/firebase';
 import { Order, OrderItem, GeoPoint } from '../types/order';
 import { estimateFloor, setBuildingBaseAltitude } from '../utils/locationUtils';
+import IndoorAtlasService from './IndoorAtlasService';
 
 function generateId(prefix: string = 'ord'): string {
   const random = Math.random().toString(36).slice(2, 10);
@@ -35,33 +36,35 @@ export class OrderService {
   }
 
   async createOrder(items: OrderItem[]): Promise<Order> {
-    // Request precise location for the order origin
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      throw new Error('Location permission not granted');
-    }
+    // Use IndoorAtlas for precise indoor positioning (falls back to GPS automatically)
+    const position = await IndoorAtlasService.getCurrentPosition();
 
-    const pos = await Location.getCurrentPositionAsync({
-      // Highest precision available to improve indoor accuracy heuristics
-      accuracy: Location.Accuracy.BestForNavigation,
-      mayShowUserSettingsDialog: true,
-    });
+    console.log(`📍 Position from ${position.source.toUpperCase()}: lat=${position.latitude}, lng=${position.longitude}, accuracy=${position.accuracy}m`);
 
-    // Set building base altitude on first order (for floor calculation)
-    if (pos.coords.altitude) {
-      setBuildingBaseAltitude(pos.coords.altitude);
+    // Determine floor number
+    let floorNumber: number | null = null;
+    
+    if (position.floor !== null) {
+      // IndoorAtlas provides floor directly - most accurate!
+      floorNumber = position.floor;
+      console.log(`🏢 IndoorAtlas detected floor: ${floorNumber}`);
+    } else if (position.altitude) {
+      // GPS fallback - estimate from altitude
+      setBuildingBaseAltitude(position.altitude);
+      floorNumber = estimateFloor(position.altitude);
+      console.log(`🏢 Auto-calibrated floor from altitude: ${floorNumber}`);
     }
 
     const origin: GeoPoint = {
-      latitude: pos.coords.latitude,
-      longitude: pos.coords.longitude,
-      accuracy: pos.coords.accuracy ?? null,
-      altitude: pos.coords.altitude ?? null,
-      altitudeAccuracy: pos.coords.altitudeAccuracy ?? null,
-      floor: pos.coords.altitude ? estimateFloor(pos.coords.altitude) : null,
-      heading: pos.coords.heading ?? null,
-      speed: pos.coords.speed ?? null,
-      timestamp: pos.timestamp,
+      latitude: position.latitude,
+      longitude: position.longitude,
+      accuracy: position.accuracy,
+      altitude: position.altitude,
+      altitudeAccuracy: null, // IndoorAtlas doesn't provide this
+      floor: floorNumber,
+      heading: position.heading,
+      speed: null,
+      timestamp: position.timestamp,
     };
 
     const order: Order = {
