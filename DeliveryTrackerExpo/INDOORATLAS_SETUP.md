@@ -63,22 +63,28 @@ Once the venue is mapped (using Android), you can:
    - **API Secret** (looks like: `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`)
 
 ### 5. Configure the App
-1. Open `/DeliveryTrackerExpo/src/config/indooratlas.ts`
-2. Replace the placeholder values:
-   ```typescript
-   export const INDOORATLAS_CONFIG = {
-     API_KEY: 'YOUR_API_KEY_HERE',      // Paste your API key
-     API_SECRET: 'YOUR_API_SECRET_HERE', // Paste your API secret
-     ENABLED: true,                      // Set to true
-   };
+1. Create a `.env` file in `/DeliveryTrackerExpo/` (use `.env.example` as template)
+2. Add your credentials:
+   ```bash
+   EXPO_PUBLIC_INDOORATLAS_API_KEY=your_api_key_here
+   EXPO_PUBLIC_INDOORATLAS_API_SECRET=your_api_secret_here
+   EXPO_PUBLIC_INDOORATLAS_ENABLED=true
    ```
+3. **Important**: The `.env` file is gitignored for security
+
+**Note**: The Android native configuration is already set up! Your API credentials from `.env` will be used automatically.
 
 ### 6. Rebuild the App
 ```bash
 cd DeliveryTrackerExpo
-npx expo prebuild --clean
-npx pod-install   # iOS only
-npx expo run:ios  # or npx expo run:android
+npx expo prebuild --clean  # Regenerate native code
+npx expo run:android       # Build and run on Android
+```
+
+**For iOS** (when iOS support is added):
+```bash
+npx pod-install
+npx expo run:ios
 ```
 
 ## How It Works
