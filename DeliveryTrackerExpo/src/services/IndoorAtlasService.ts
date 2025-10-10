@@ -2,31 +2,13 @@
  * IndoorAtlas Service
  * Provides indoor positioning with sub-meter accuracy
  * Falls back to GPS when IndoorAtlas is not configured
+ * Supports both Android and iOS
  */
 
 import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 import { INDOORATLAS_CONFIG, isIndoorAtlasConfigured } from '../config/indooratlas';
-
-// Type definitions for react-native-indoor-atlas
-interface IndoorAtlasLocation {
-  latitude: number;
-  longitude: number;
-  accuracy: number;
-  floor: number;
-  timestamp: number;
-  bearing?: number;
-}
-
-// Mock IndoorAtlas module (will be replaced with actual import when native modules are linked)
-let IndoorAtlas: any = null;
-
-try {
-  // Try to import the native module
-  IndoorAtlas = require('react-native-indoor-atlas');
-} catch (error) {
-  console.log('⚠️ IndoorAtlas native module not available, will use GPS fallback');
-}
+import { nativeModule, eventEmitter, IndoorAtlasLocation } from './IndoorAtlasNativeModule';
 
 export interface IAPosition {
   latitude: number;
@@ -53,27 +35,30 @@ class IndoorAtlasService {
       return this.isIndoorAtlasAvailable;
     }
 
-    console.log('🏢 Initializing IndoorAtlas Service...');
+    console.log(`🏢 Initializing IndoorAtlas Service on ${Platform.OS}...`);
 
     // Check if IndoorAtlas is configured and available
-    if (isIndoorAtlasConfigured() && IndoorAtlas && Platform.OS === 'android') {
+    if (isIndoorAtlasConfigured() && nativeModule) {
       try {
         // Initialize IndoorAtlas with API credentials
-        await IndoorAtlas.initialize(
+        await nativeModule.initialize(
           INDOORATLAS_CONFIG.API_KEY,
           INDOORATLAS_CONFIG.API_SECRET
         );
         
         this.isIndoorAtlasAvailable = true;
         this.isInitialized = true;
-        console.log('✅ IndoorAtlas initialized successfully');
+        console.log(`✅ IndoorAtlas initialized successfully on ${Platform.OS}`);
         return true;
       } catch (error) {
         console.error('❌ IndoorAtlas initialization failed:', error);
         this.isIndoorAtlasAvailable = false;
       }
     } else {
-      console.log('📍 IndoorAtlas not configured, using GPS fallback');
+      const reason = !isIndoorAtlasConfigured() 
+        ? 'not configured' 
+        : 'native module not available';
+      console.log(`📍 IndoorAtlas ${reason}, using GPS fallback`);
       this.isIndoorAtlasAvailable = false;
     }
 
@@ -87,9 +72,9 @@ class IndoorAtlasService {
   async getCurrentPosition(): Promise<IAPosition> {
     await this.initialize();
 
-    if (this.isIndoorAtlasAvailable) {
+    if (this.isIndoorAtlasAvailable && nativeModule) {
       try {
-        const position: IndoorAtlasLocation = await IndoorAtlas.getCurrentPosition();
+        const position: IndoorAtlasLocation = await nativeModule.getCurrentPosition();
         console.log('🏢 IndoorAtlas position:', position);
         
         return {
@@ -97,7 +82,7 @@ class IndoorAtlasService {
           longitude: position.longitude,
           accuracy: position.accuracy,
           altitude: null, // IndoorAtlas doesn't provide altitude
-          floor: position.floor,
+          floor: position.floor ?? null,
           heading: position.bearing ?? null,
           timestamp: position.timestamp,
           source: 'indooratlas',
@@ -139,35 +124,42 @@ class IndoorAtlasService {
 
     this.listeners.push(callback);
 
-    if (this.isIndoorAtlasAvailable) {
+    if (this.isIndoorAtlasAvailable && nativeModule) {
       try {
-        // Subscribe to IndoorAtlas position updates
-        const subscription = IndoorAtlas.watchPosition(
-          (position: IndoorAtlasLocation) => {
-            const iaPosition: IAPosition = {
-              latitude: position.latitude,
-              longitude: position.longitude,
-              accuracy: position.accuracy,
-              altitude: null,
-              floor: position.floor,
-              heading: position.bearing ?? null,
-              timestamp: position.timestamp,
-              source: 'indooratlas',
-            };
-            
-            this.listeners.forEach(listener => listener(iaPosition));
-          },
-          (error: any) => {
-            console.error('⚠️ IndoorAtlas watch error:', error);
-          }
-        );
+        // Start watching position updates
+        nativeModule.startWatching();
+        
+        // Subscribe to location events
+        let eventSubscription: any = null;
+        if (eventEmitter) {
+          eventSubscription = eventEmitter.addListener(
+            'IndoorAtlas:locationChanged',
+            (position: IndoorAtlasLocation) => {
+              const iaPosition: IAPosition = {
+                latitude: position.latitude,
+                longitude: position.longitude,
+                accuracy: position.accuracy,
+                altitude: null,
+                floor: position.floor ?? null,
+                heading: position.bearing ?? null,
+                timestamp: position.timestamp,
+                source: 'indooratlas',
+              };
+              
+              this.listeners.forEach(listener => listener(iaPosition));
+            }
+          );
+        }
 
-        console.log('✅ IndoorAtlas position watching started');
+        console.log(`✅ IndoorAtlas position watching started on ${Platform.OS}`);
 
         return () => {
           this.listeners = this.listeners.filter(l => l !== callback);
-          if (subscription && subscription.remove) {
-            subscription.remove();
+          if (eventSubscription) {
+            eventSubscription.remove();
+          }
+          if (nativeModule) {
+            nativeModule.stopWatching();
           }
         };
       } catch (error) {
@@ -223,8 +215,8 @@ class IndoorAtlasService {
       this.locationSubscription = null;
     }
 
-    if (this.isIndoorAtlasAvailable && IndoorAtlas && IndoorAtlas.stopWatching) {
-      IndoorAtlas.stopWatching();
+    if (this.isIndoorAtlasAvailable && nativeModule) {
+      nativeModule.stopWatching();
     }
 
     this.listeners = [];

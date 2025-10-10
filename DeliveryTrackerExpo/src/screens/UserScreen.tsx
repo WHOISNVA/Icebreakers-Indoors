@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, FlatList, TextInput, Modal } from 'react-native';
+import * as Location from 'expo-location';
 import { orderService } from '../services/OrderService';
 import { OrderItem } from '../types/order';
 import PingService from '../services/PingService';
@@ -16,6 +17,26 @@ export default function UserScreen() {
   const [lastOrderId, setLastOrderId] = useState<string | null>(null);
   const [details, setDetails] = useState<string>('');
   const [showDetailsModal, setShowDetailsModal] = useState<boolean>(false);
+  const [locationPermissionGranted, setLocationPermissionGranted] = useState<boolean>(false);
+
+  // Request location permissions on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        setLocationPermissionGranted(status === 'granted');
+        if (status !== 'granted') {
+          Alert.alert(
+            'Location Permission Required',
+            'This app needs location access to place orders and track deliveries.',
+            [{ text: 'OK' }]
+          );
+        }
+      } catch (error) {
+        console.error('Error requesting location permission:', error);
+      }
+    })();
+  }, []);
 
   // Set user ID and subscribe to pings
   useEffect(() => {
@@ -68,6 +89,11 @@ export default function UserScreen() {
       return;
     }
     
+    if (!locationPermissionGranted) {
+      Alert.alert('Location Required', 'Please grant location permission to place orders.');
+      return;
+    }
+    
     try {
       // Order creation now automatically detects floor from altitude
       const order = await orderService.createOrder(items);
@@ -76,6 +102,7 @@ export default function UserScreen() {
       setLastOrderId(order.id);
       setDetails('');
     } catch (e: any) {
+      console.error('Order creation error:', e);
       Alert.alert('Error', e?.message || 'Failed to create order');
     }
   };

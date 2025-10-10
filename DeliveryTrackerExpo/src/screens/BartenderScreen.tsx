@@ -6,7 +6,7 @@ import { Order } from '../types/order';
 import * as Location from 'expo-location';
 import PingService from '../services/PingService';
 import DeliveryTrackingService from '../services/DeliveryTrackingService';
-import { formatDistance, formatFloor, resetBuildingBaseAltitude, getBuildingBaseAltitude, setFloorOffset, getFloorOffset } from '../utils/locationUtils';
+import { formatDistance, formatFloor } from '../utils/locationUtils';
 import ARNavigationView from '../components/ARNavigationView';
 
 function mapsUrl(lat: number, lng: number): string {
@@ -21,11 +21,14 @@ export default function BartenderScreen() {
   const [sortBy, setSortBy] = useState<SortOption>('timestamp');
   const [barLocation, setBarLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [showCalibration, setShowCalibration] = useState(false);
+  
   const [showCompletedOrders, setShowCompletedOrders] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [showARView, setShowARView] = useState(false);
   const [deliveryStatus, setDeliveryStatus] = useState<any>(null);
+
+  const formatOrderItems = (order: Order): string =>
+    order.items.map(it => `${it.name} x${it.quantity}`).join(', ');
 
   useEffect(() => {
     // Set bartender user ID for ping service
@@ -97,52 +100,7 @@ export default function BartenderScreen() {
     }
   };
 
-  const handleResetFloorCalibration = () => {
-    const currentBase = getBuildingBaseAltitude();
-    const currentOffset = getFloorOffset();
-    
-    Alert.alert(
-      '🏢 Floor Calibration',
-      currentBase 
-        ? `Base altitude: ${currentBase.toFixed(1)}m\nFloor offset: ${currentOffset > 0 ? '+' : ''}${currentOffset}\n\nWhat would you like to do?`
-        : 'No calibration yet. First order will set the reference.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Set Current Floor',
-          onPress: () => {
-            Alert.prompt(
-              'What floor are you on?',
-              'Enter the current floor number (0 = ground floor)',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Set',
-                  onPress: (value?: string) => {
-                    const floor = parseInt(value || '0', 10);
-                    if (!isNaN(floor)) {
-                      setFloorOffset(floor);
-                      Alert.alert('✅ Floor Set', `Current location is now ${formatFloor(floor)}`);
-                    }
-                  },
-                },
-              ],
-              'plain-text',
-              '3'
-            );
-          },
-        },
-        {
-          text: 'Reset All',
-          style: 'destructive',
-          onPress: () => {
-            resetBuildingBaseAltitude();
-            Alert.alert('✅ Reset Complete', 'Floor calibration cleared. Place a new order to recalibrate.');
-          },
-        },
-      ]
-    );
-  };
+  
 
   const openDeliveryMap = (order?: Order) => {
     if (order) {
@@ -210,6 +168,13 @@ export default function BartenderScreen() {
       DeliveryTrackingService.stopTrackingDelivery(selectedOrder.id);
     }
     setShowARView(false);
+  };
+
+  const viewAllOnMap = () => {
+    if (selectedOrder) {
+      DeliveryTrackingService.stopTrackingDelivery(selectedOrder.id);
+    }
+    setSelectedOrder(null);
   };
 
   const handleARArrival = () => {
@@ -329,11 +294,6 @@ export default function BartenderScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Incoming Orders</Text>
-        {unfulfilled.length > 0 && (
-          <TouchableOpacity style={styles.viewAllBtn} onPress={() => openDeliveryMap()}>
-            <Text style={styles.viewAllText}>🗺️ View All ({unfulfilled.length})</Text>
-          </TouchableOpacity>
-        )}
       </View>
       
       <View style={styles.sortContainer}>
@@ -348,12 +308,6 @@ export default function BartenderScreen() {
           onPress={() => setSortBy('proximity')}
         >
           <Text style={[styles.sortText, sortBy === 'proximity' ? styles.sortTextActive : null]}>By Distance</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.calibrateBtn} 
-          onPress={handleResetFloorCalibration}
-        >
-          <Text style={styles.calibrateText}>🏢 Floor Cal.</Text>
         </TouchableOpacity>
       </View>
       
@@ -495,7 +449,7 @@ export default function BartenderScreen() {
               <View style={styles.statusOverlay}>
                 {selectedOrder && deliveryStatus ? (
                   <>
-                    <Text style={styles.statusTitle}>Order {selectedOrder.id}</Text>
+                    <Text style={styles.statusTitle}>{formatOrderItems(selectedOrder)}</Text>
                     {selectedOrder.detailsNote && (
                       <Text style={styles.statusNote}>📍 {selectedOrder.detailsNote}</Text>
                     )}
@@ -537,12 +491,20 @@ export default function BartenderScreen() {
                   <Text style={styles.mapBtnTextSecondary}>Close</Text>
                 </TouchableOpacity>
                 {selectedOrder && (
+                  <TouchableOpacity 
+                    style={[styles.mapBtn, styles.mapBtnSecondary]} 
+                    onPress={viewAllOnMap}
+                  >
+                    <Text style={styles.mapBtnTextSecondary}>View All ({unfulfilled.length})</Text>
+                  </TouchableOpacity>
+                )}
+                {selectedOrder && (
                   <>
                     <TouchableOpacity 
                       style={[styles.mapBtn, styles.mapBtnAR]} 
                       onPress={switchToARMode}
                     >
-                      <Text style={styles.mapBtnText}>📹 AR Mode</Text>
+                      <Text style={styles.mapBtnText}>AR Mode</Text>
                     </TouchableOpacity>
                     {deliveryStatus && (
                       <TouchableOpacity 
@@ -550,7 +512,7 @@ export default function BartenderScreen() {
                         onPress={markDelivered}
                       >
                         <Text style={styles.mapBtnText}>
-                          {deliveryStatus.hasArrived ? '✅ Delivered' : 'Complete'}
+                          {deliveryStatus.hasArrived ? 'Delivered' : 'Complete'}
                         </Text>
                       </TouchableOpacity>
                     )}
@@ -570,7 +532,7 @@ export default function BartenderScreen() {
             targetLongitude={(selectedOrder.currentLocation || selectedOrder.origin).longitude}
             targetAltitude={(selectedOrder.currentLocation || selectedOrder.origin).altitude ?? undefined}
             targetFloor={(selectedOrder.currentLocation || selectedOrder.origin).floor ?? undefined}
-            targetName={`Order ${selectedOrder.id}`}
+            targetName={formatOrderItems(selectedOrder)}
             onClose={closeARView}
             onArrived={handleARArrival}
           />
@@ -711,7 +673,7 @@ const styles = StyleSheet.create({
   mapBtnAR: { backgroundColor: '#AF52DE' },
   mapBtnSecondary: { backgroundColor: '#F2F2F7', borderWidth: 1, borderColor: '#C7C7CC' },
   mapBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  mapBtnTextSecondary: { color: '#1C1C1E', fontSize: 16, fontWeight: '700' },
+  mapBtnTextSecondary: { color: '#1C1C1E', fontSize: 16, fontWeight: '700', textAlign: 'center' },
 });
 
 

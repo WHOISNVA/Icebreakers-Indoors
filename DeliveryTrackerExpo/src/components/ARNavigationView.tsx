@@ -5,6 +5,7 @@ import * as Location from 'expo-location';
 import { Magnetometer } from 'expo-sensors';
 import { calculateDistance, calculateBearing, formatDistance, formatFloor, estimateFloor, calculateVerticalDistance } from '../utils/locationUtils';
 import IndoorAtlasService from '../services/IndoorAtlasService';
+import IndoorAtlasARService from '../services/IndoorAtlasARService';
 
 interface ARNavigationViewProps {
   targetLatitude: number;
@@ -65,6 +66,16 @@ export default function ARNavigationView({
   // Track current location
   useEffect(() => {
     const startTracking = async () => {
+      // Start IndoorAtlas AR wayfinding (if available)
+      if (IndoorAtlasARService.isARWayfindingAvailable()) {
+        await IndoorAtlasARService.startARWayfinding(
+          targetLatitude,
+          targetLongitude,
+          targetFloor ?? undefined
+        );
+        console.log('🎯 IndoorAtlas AR wayfinding enabled');
+      }
+
       // Use IndoorAtlas for precise tracking (falls back to GPS automatically)
       const unsubscribe = await IndoorAtlasService.watchPosition((position) => {
         // Convert to Location.LocationObject format for compatibility
@@ -131,9 +142,13 @@ export default function ARNavigationView({
     startTracking();
 
     return () => {
+      // Stop IndoorAtlas AR wayfinding
+      if (IndoorAtlasARService.isARWayfindingAvailable()) {
+        IndoorAtlasARService.stopARWayfinding();
+      }
       locationSubscription.current?.remove();
     };
-  }, [targetLatitude, targetLongitude, hasArrived, onArrived]);
+  }, [targetLatitude, targetLongitude, targetFloor, hasArrived, onArrived]);
 
   if (!permission) {
     return <View style={styles.container}><Text>Requesting camera permission...</Text></View>;
@@ -143,7 +158,14 @@ export default function ARNavigationView({
     return (
       <View style={styles.container}>
         <Text style={styles.permissionText}>Camera permission is required for AR navigation</Text>
-        <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission}>
+        <TouchableOpacity 
+          style={styles.permissionBtn} 
+          onPress={async () => {
+            console.log('📸 Requesting camera permission...');
+            const result = await requestPermission();
+            console.log('📸 Camera permission result:', result);
+          }}
+        >
           <Text style={styles.permissionBtnText}>Grant Permission</Text>
         </TouchableOpacity>
       </View>
@@ -187,12 +209,12 @@ export default function ARNavigationView({
                 {currentFloor !== null && (
                   <Text style={styles.floorInfoText}>📍 You: {formatFloor(currentFloor)}</Text>
                 )}
-                {targetFloor !== null && (
+                {targetFloor !== null && targetFloor !== undefined && (
                   <Text style={styles.floorInfoText}>🎯 Target: {formatFloor(targetFloor)}</Text>
                 )}
                 {verticalDistance !== null && verticalDistance > 1 && (
                   <Text style={[styles.floorInfoText, styles.floorWarning]}>
-                    {currentFloor !== null && targetFloor !== null && currentFloor < targetFloor ? '⬆️' : '⬇️'} {verticalDistance.toFixed(1)}m vertical
+                    {currentFloor !== null && targetFloor !== null && targetFloor !== undefined && currentFloor < targetFloor ? '⬆️' : '⬇️'} {verticalDistance.toFixed(1)}m vertical
                   </Text>
                 )}
               </View>
