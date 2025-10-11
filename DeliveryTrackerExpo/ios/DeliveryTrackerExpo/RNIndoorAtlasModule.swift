@@ -1,10 +1,3 @@
-//
-//  RNIndoorAtlasModule.swift
-//  DeliveryTrackerExpo
-//
-//  IndoorAtlas iOS Native Module Bridge
-//
-
 import Foundation
 import IndoorAtlas
 import React
@@ -13,153 +6,143 @@ import React
 class RNIndoorAtlasModule: RCTEventEmitter {
   
   private var locationManager: IALocationManager?
-  private var isInitialized = false
-  private var hasListeners = false
-  
-  override init() {
-    super.init()
-  }
-  
-  // MARK: - Required RCTEventEmitter Methods
+  private var isWatching = false
+  private var pendingLocationResolver: RCTPromiseResolveBlock?
+  private var pendingLocationRejecter: RCTPromiseRejectBlock?
+  private var locationTimeout: Timer?
   
   override static func requiresMainQueueSetup() -> Bool {
     return true
   }
   
   override func supportedEvents() -> [String]! {
-    return ["IndoorAtlas:locationChanged", "IndoorAtlas:statusChanged"]
+    return ["IndoorAtlas:locationChanged"]
   }
-  
-  override func startObserving() {
-    hasListeners = true
-  }
-  
-  override func stopObserving() {
-    hasListeners = false
-  }
-  
-  // MARK: - IndoorAtlas Methods
   
   @objc
   func initialize(_ apiKey: String, apiSecret: String, resolver: @escaping RCTPromiseResolveBlock, rejecter: @escaping RCTPromiseRejectBlock) {
-    DispatchQueue.main.async { [weak self] in
-      guard let self = self else {
-        rejecter("ERROR", "Module deallocated", nil)
-        return
-      }
+    DispatchQueue.main.async {
+      // Initialize IndoorAtlas location manager
+      self.locationManager = IALocationManager.sharedInstance()
+      self.locationManager?.setApiKey(apiKey, andSecret: apiSecret)
+      self.locationManager?.delegate = self
       
-      do {
-        // Initialize IndoorAtlas with API credentials
-        self.locationManager = IALocationManager.sharedInstance()
-        self.locationManager?.delegate = self
-        
-        // Set API key and secret
-        let config = IALocationManager.sharedInstance()
-        config.setApiKey(apiKey, andSecret: apiSecret)
-        
-        self.isInitialized = true
-        resolver(true)
-      } catch {
-        rejecter("INIT_ERROR", "Failed to initialize IndoorAtlas: \(error.localizedDescription)", error)
-      }
+      print("✅ IndoorAtlas iOS SDK initialized with API key: \(apiKey.prefix(8))...")
+      resolver(true)
     }
   }
   
   @objc
   func getCurrentPosition(_ resolver: @escaping RCTPromiseResolveBlock, rejecter: @escaping RCTPromiseRejectBlock) {
-    guard isInitialized, let locationManager = locationManager else {
-      rejecter("NOT_INITIALIZED", "IndoorAtlas not initialized", nil)
+    guard let manager = locationManager else {
+      rejecter("NO_MANAGER", "IndoorAtlas not initialized. Call initialize() first.", nil)
       return
     }
     
-    // Start location updates if not already started
-    DispatchQueue.main.async {
-      locationManager.startUpdatingLocation()
+    // Store resolver/rejecter for callback
+    pendingLocationResolver = resolver
+    pendingLocationRejecter = rejecter
+    
+    // Set timeout for location acquisition (10 seconds)
+    locationTimeout?.invalidate()
+    locationTimeout = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: false) { [weak self] _ in
+      guard let self = self else { return }
+      if self.pendingLocationRejecter != nil {
+        self.pendingLocationRejecter?("TIMEOUT", "Location acquisition timed out after 10 seconds", nil)
+        self.pendingLocationResolver = nil
+        self.pendingLocationRejecter = nil
+      }
     }
     
-    // Get the latest location
-    if let location = locationManager.location {
-      let position = self.createPositionDict(from: location)
-      resolver(position)
-    } else {
-      // No location yet - reject so JS can fall back to GPS
-      rejecter("NO_LOCATION", "IndoorAtlas location not available yet, use GPS", nil)
-    }
+    // Start location updates temporarily
+    print("📍 Starting IndoorAtlas location update for getCurrentPosition...")
+    manager.startUpdatingLocation()
   }
   
   @objc
   func startWatching() {
-    guard isInitialized, let locationManager = locationManager else {
+    guard let manager = locationManager, !isWatching else {
+      print("⚠️ IndoorAtlas: startWatching called but manager unavailable or already watching")
       return
     }
     
-    DispatchQueue.main.async {
-      locationManager.startUpdatingLocation()
-    }
+    isWatching = true
+    print("👀 Starting IndoorAtlas continuous location watching...")
+    manager.startUpdatingLocation()
   }
   
   @objc
   func stopWatching() {
-    guard let locationManager = locationManager else {
+    guard let manager = locationManager else {
+      print("⚠️ IndoorAtlas: stopWatching called but manager unavailable")
       return
     }
     
-    DispatchQueue.main.async {
-      locationManager.stopUpdatingLocation()
-    }
-  }
-  
-  // MARK: - Helper Methods
-  
-  private func createPositionDict(from location: IALocation) -> [String: Any] {
-    var position: [String: Any] = [
-      "latitude": location.location?.coordinate.latitude ?? 0,
-      "longitude": location.location?.coordinate.longitude ?? 0,
-      "accuracy": location.location?.horizontalAccuracy ?? 0,
-      "timestamp": location.location?.timestamp.timeIntervalSince1970 ?? 0
-    ]
-    
-    // Add floor level if available
-    if location.floor != nil {
-      position["floor"] = location.floor?.level ?? 0
-    }
-    
-    // Add bearing if available
-    if let heading = location.location?.course, heading >= 0 {
-      position["bearing"] = heading
-    }
-    
-    return position
+    isWatching = false
+    print("🛑 Stopping IndoorAtlas location watching...")
+    manager.stopUpdatingLocation()
   }
 }
 
 // MARK: - IALocationManagerDelegate
-
 extension RNIndoorAtlasModule: IALocationManagerDelegate {
   
   func indoorLocationManager(_ manager: IALocationManager, didUpdateLocations locations: [Any]) {
-    guard hasListeners, let location = locations.last as? IALocation else {
+    guard let location = locations.last as? IALocation else {
+      print("⚠️ IndoorAtlas: Received invalid location object")
       return
     }
     
-    let position = createPositionDict(from: location)
-    sendEvent(withName: "IndoorAtlas:locationChanged", body: position)
-  }
-  
-  func indoorLocationManager(_ manager: IALocationManager, didFailWithError error: Error) {
-    if hasListeners {
-      sendEvent(withName: "IndoorAtlas:statusChanged", body: [
-        "status": "error",
-        "message": error.localizedDescription
-      ])
+    guard let coordinate = location.location?.coordinate else {
+      print("⚠️ IndoorAtlas: Location has no valid coordinate")
+      return
+    }
+    
+    let accuracy = location.location?.horizontalAccuracy ?? 999.0
+    let floorLevel = location.floor?.level
+    let timestamp = Date().timeIntervalSince1970 * 1000 // milliseconds
+    let bearing = location.location?.course ?? -1
+    
+    let locationData: [String: Any] = [
+      "latitude": coordinate.latitude,
+      "longitude": coordinate.longitude,
+      "accuracy": accuracy,
+      "floor": floorLevel as Any,
+      "timestamp": timestamp,
+      "bearing": bearing >= 0 ? bearing : NSNull()
+    ]
+    
+    print("📍 IndoorAtlas location update: lat=\(coordinate.latitude), lon=\(coordinate.longitude), accuracy=\(accuracy)m, floor=\(floorLevel?.description ?? "nil")")
+    
+    // If there's a pending promise (from getCurrentPosition), resolve it
+    if let resolver = pendingLocationResolver {
+      locationTimeout?.invalidate()
+      resolver(locationData)
+      pendingLocationResolver = nil
+      pendingLocationRejecter = nil
+      
+      // Stop updating if not in continuous watch mode
+      if !isWatching {
+        manager.stopUpdatingLocation()
+      }
+    }
+    
+    // Always send event for continuous watching
+    if isWatching {
+      sendEvent(withName: "IndoorAtlas:locationChanged", body: locationData)
     }
   }
   
-  func indoorLocationManager(_ manager: IALocationManager, didEnter region: IARegion) {
-    // Handle region enter if needed
-  }
-  
-  func indoorLocationManager(_ manager: IALocationManager, didExit region: IARegion) {
-    // Handle region exit if needed
+  func indoorLocationManager(_ manager: IALocationManager, didFailWithError error: Error) {
+    print("❌ IndoorAtlas location error: \(error.localizedDescription)")
+    
+    // If there's a pending promise, reject it
+    if let rejecter = pendingLocationRejecter {
+      locationTimeout?.invalidate()
+      rejecter("LOCATION_ERROR", error.localizedDescription, error)
+      pendingLocationResolver = nil
+      pendingLocationRejecter = nil
+    }
   }
 }
+

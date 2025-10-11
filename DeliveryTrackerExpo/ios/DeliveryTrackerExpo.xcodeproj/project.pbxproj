@@ -7,37 +7,29 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		07BE90DB288AE76AE048F0F6 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 349DE3B715EB561C4AA61649 /* ExpoModulesProvider.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		4608CE185535F02C1D1BB141 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8FBB91715B6C04859D8CC32 /* ExpoModulesProvider.swift */; };
-		8A9AB06E4B26AD8F9A1F718E /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 78680C1F9D379420A165D812 /* PrivacyInfo.xcprivacy */; };
+		768D6B4BDB4B84028CE59C31 /* libPods-DeliveryTrackerExpo.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D0681C7B4E0FEA459087385 /* libPods-DeliveryTrackerExpo.a */; };
+		9CE71B91CB97A671C959FFE7 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 80E10D3E57DE38321F1A0D54 /* PrivacyInfo.xcprivacy */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
-		F0D2B381F271E9A7101878A1 /* libPods-DeliveryTrackerExpo.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 47733706F52EE84946328591 /* libPods-DeliveryTrackerExpo.a */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
-		F11748502D0722830044C1D9 /* RNIndoorAtlasModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748452D0722830044C1D9 /* RNIndoorAtlasModule.swift */; };
-		F11748512D0722830044C1D9 /* RNIndoorAtlasModule.m in Sources */ = {isa = PBXBuildFile; fileRef = F11748462D0722830044C1D9 /* RNIndoorAtlasModule.m */; };
-		F11748522D0722840044C1D9 /* RNIndoorAtlasARModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748472D0722840044C1D9 /* RNIndoorAtlasARModule.swift */; };
-		F11748532D0722840044C1D9 /* RNIndoorAtlasARModule.m in Sources */ = {isa = PBXBuildFile; fileRef = F11748482D0722840044C1D9 /* RNIndoorAtlasARModule.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		13B07F961A680F5B00A75B9A /* DeliveryTrackerExpo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DeliveryTrackerExpo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = DeliveryTrackerExpo/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = DeliveryTrackerExpo/Info.plist; sourceTree = "<group>"; };
-		1912206E872EADB9FFA47CDA /* Pods-DeliveryTrackerExpo.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-DeliveryTrackerExpo.release.xcconfig"; path = "Target Support Files/Pods-DeliveryTrackerExpo/Pods-DeliveryTrackerExpo.release.xcconfig"; sourceTree = "<group>"; };
-		4189879508970CDB637A9E6E /* Pods-DeliveryTrackerExpo.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-DeliveryTrackerExpo.debug.xcconfig"; path = "Target Support Files/Pods-DeliveryTrackerExpo/Pods-DeliveryTrackerExpo.debug.xcconfig"; sourceTree = "<group>"; };
-		47733706F52EE84946328591 /* libPods-DeliveryTrackerExpo.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-DeliveryTrackerExpo.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		78680C1F9D379420A165D812 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = DeliveryTrackerExpo/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		1C2D4CB4D80B3FA625AA2986 /* Pods-DeliveryTrackerExpo.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-DeliveryTrackerExpo.debug.xcconfig"; path = "Target Support Files/Pods-DeliveryTrackerExpo/Pods-DeliveryTrackerExpo.debug.xcconfig"; sourceTree = "<group>"; };
+		2D0681C7B4E0FEA459087385 /* libPods-DeliveryTrackerExpo.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-DeliveryTrackerExpo.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		349DE3B715EB561C4AA61649 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-DeliveryTrackerExpo/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		414C3CC718F1314CECDA2502 /* Pods-DeliveryTrackerExpo.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-DeliveryTrackerExpo.release.xcconfig"; path = "Target Support Files/Pods-DeliveryTrackerExpo/Pods-DeliveryTrackerExpo.release.xcconfig"; sourceTree = "<group>"; };
+		80E10D3E57DE38321F1A0D54 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = DeliveryTrackerExpo/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = DeliveryTrackerExpo/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		C8FBB91715B6C04859D8CC32 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-DeliveryTrackerExpo/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = DeliveryTrackerExpo/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* DeliveryTrackerExpo-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "DeliveryTrackerExpo-Bridging-Header.h"; path = "DeliveryTrackerExpo/DeliveryTrackerExpo-Bridging-Header.h"; sourceTree = "<group>"; };
-		F11748452D0722830044C1D9 /* RNIndoorAtlasModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RNIndoorAtlasModule.swift; path = DeliveryTrackerExpo/RNIndoorAtlasModule.swift; sourceTree = "<group>"; };
-		F11748462D0722830044C1D9 /* RNIndoorAtlasModule.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = RNIndoorAtlasModule.m; path = DeliveryTrackerExpo/RNIndoorAtlasModule.m; sourceTree = "<group>"; };
-		F11748472D0722840044C1D9 /* RNIndoorAtlasARModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RNIndoorAtlasARModule.swift; path = DeliveryTrackerExpo/RNIndoorAtlasARModule.swift; sourceTree = "<group>"; };
-		F11748482D0722840044C1D9 /* RNIndoorAtlasARModule.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = RNIndoorAtlasARModule.m; path = DeliveryTrackerExpo/RNIndoorAtlasARModule.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,7 +37,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F0D2B381F271E9A7101878A1 /* libPods-DeliveryTrackerExpo.a in Frameworks */,
+				768D6B4BDB4B84028CE59C31 /* libPods-DeliveryTrackerExpo.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -57,15 +49,11 @@
 			children = (
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
 				F11748442D0722820044C1D9 /* DeliveryTrackerExpo-Bridging-Header.h */,
-				F11748452D0722830044C1D9 /* RNIndoorAtlasModule.swift */,
-				F11748462D0722830044C1D9 /* RNIndoorAtlasModule.m */,
-				F11748472D0722840044C1D9 /* RNIndoorAtlasARModule.swift */,
-				F11748482D0722840044C1D9 /* RNIndoorAtlasARModule.m */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				78680C1F9D379420A165D812 /* PrivacyInfo.xcprivacy */,
+				80E10D3E57DE38321F1A0D54 /* PrivacyInfo.xcprivacy */,
 			);
 			name = DeliveryTrackerExpo;
 			sourceTree = "<group>";
@@ -74,17 +62,9 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				47733706F52EE84946328591 /* libPods-DeliveryTrackerExpo.a */,
+				2D0681C7B4E0FEA459087385 /* libPods-DeliveryTrackerExpo.a */,
 			);
 			name = Frameworks;
-			sourceTree = "<group>";
-		};
-		7791340E3FA2C77FBEE02F84 /* DeliveryTrackerExpo */ = {
-			isa = PBXGroup;
-			children = (
-				C8FBB91715B6C04859D8CC32 /* ExpoModulesProvider.swift */,
-			);
-			name = DeliveryTrackerExpo;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -101,8 +81,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				F59610F4DE9C52637D08289C /* Pods */,
-				A412B50213CDFA18CB29C504 /* ExpoModulesProviders */,
+				F739235B77DBA7BBEC08B6B9 /* Pods */,
+				B39E4FBAA041DCFD50B022C4 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -117,10 +97,18 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		A412B50213CDFA18CB29C504 /* ExpoModulesProviders */ = {
+		A63D3C44E657B9ADE40CBF8D /* DeliveryTrackerExpo */ = {
 			isa = PBXGroup;
 			children = (
-				7791340E3FA2C77FBEE02F84 /* DeliveryTrackerExpo */,
+				349DE3B715EB561C4AA61649 /* ExpoModulesProvider.swift */,
+			);
+			name = DeliveryTrackerExpo;
+			sourceTree = "<group>";
+		};
+		B39E4FBAA041DCFD50B022C4 /* ExpoModulesProviders */ = {
+			isa = PBXGroup;
+			children = (
+				A63D3C44E657B9ADE40CBF8D /* DeliveryTrackerExpo */,
 			);
 			name = ExpoModulesProviders;
 			sourceTree = "<group>";
@@ -134,11 +122,11 @@
 			path = DeliveryTrackerExpo/Supporting;
 			sourceTree = "<group>";
 		};
-		F59610F4DE9C52637D08289C /* Pods */ = {
+		F739235B77DBA7BBEC08B6B9 /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				4189879508970CDB637A9E6E /* Pods-DeliveryTrackerExpo.debug.xcconfig */,
-				1912206E872EADB9FFA47CDA /* Pods-DeliveryTrackerExpo.release.xcconfig */,
+				1C2D4CB4D80B3FA625AA2986 /* Pods-DeliveryTrackerExpo.debug.xcconfig */,
+				414C3CC718F1314CECDA2502 /* Pods-DeliveryTrackerExpo.release.xcconfig */,
 			);
 			path = Pods;
 			sourceTree = "<group>";
@@ -151,13 +139,13 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "DeliveryTrackerExpo" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				8C481F7D5F106335E6226AE9 /* [Expo] Configure project */,
+				AD9CAD71F79DF7994FBE21F3 /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				D4F7D80AFA1F91F2437CBE2F /* [CP] Embed Pods Frameworks */,
+				20A5DE714AE9A76A909F983B /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -207,7 +195,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				8A9AB06E4B26AD8F9A1F718E /* PrivacyInfo.xcprivacy in Resources */,
+				9CE71B91CB97A671C959FFE7 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -253,6 +241,30 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
+		20A5DE714AE9A76A909F983B /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-DeliveryTrackerExpo/Pods-DeliveryTrackerExpo-frameworks.sh",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/IndoorAtlas/IndoorAtlas.framework/IndoorAtlas",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/React-Core-prebuilt/React.framework/React",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ReactNativeDependencies/ReactNativeDependencies.framework/ReactNativeDependencies",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/IndoorAtlas.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/React.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ReactNativeDependencies.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-DeliveryTrackerExpo/Pods-DeliveryTrackerExpo-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
 		800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -287,7 +299,7 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-DeliveryTrackerExpo/Pods-DeliveryTrackerExpo-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		8C481F7D5F106335E6226AE9 /* [Expo] Configure project */ = {
+		AD9CAD71F79DF7994FBE21F3 /* [Expo] Configure project */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -311,30 +323,6 @@
 			shellPath = /bin/sh;
 			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-DeliveryTrackerExpo/expo-configure-project.sh\"\n";
 		};
-		D4F7D80AFA1F91F2437CBE2F /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-DeliveryTrackerExpo/Pods-DeliveryTrackerExpo-frameworks.sh",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/IndoorAtlas/IndoorAtlas.framework/IndoorAtlas",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/React-Core-prebuilt/React.framework/React",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ReactNativeDependencies/ReactNativeDependencies.framework/ReactNativeDependencies",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputPaths = (
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/IndoorAtlas.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/React.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ReactNativeDependencies.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-DeliveryTrackerExpo/Pods-DeliveryTrackerExpo-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -343,11 +331,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				4608CE185535F02C1D1BB141 /* ExpoModulesProvider.swift in Sources */,
-				F11748502D0722830044C1D9 /* RNIndoorAtlasModule.swift in Sources */,
-				F11748512D0722830044C1D9 /* RNIndoorAtlasModule.m in Sources */,
-				F11748522D0722840044C1D9 /* RNIndoorAtlasARModule.swift in Sources */,
-				F11748532D0722840044C1D9 /* RNIndoorAtlasARModule.m in Sources */,
+				07BE90DB288AE76AE048F0F6 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -356,7 +340,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 4189879508970CDB637A9E6E /* Pods-DeliveryTrackerExpo.debug.xcconfig */;
+			baseConfigurationReference = 1C2D4CB4D80B3FA625AA2986 /* Pods-DeliveryTrackerExpo.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -393,7 +377,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 1912206E872EADB9FFA47CDA /* Pods-DeliveryTrackerExpo.release.xcconfig */;
+			baseConfigurationReference = 414C3CC718F1314CECDA2502 /* Pods-DeliveryTrackerExpo.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;

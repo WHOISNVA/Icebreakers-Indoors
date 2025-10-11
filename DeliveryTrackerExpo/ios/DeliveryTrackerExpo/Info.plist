@@ -49,36 +49,19 @@
       <false/>
       <key>NSAllowsLocalNetworking</key>
       <true/>
-      <key>NSExceptionDomains</key>
-      <dict>
-        <key>localhost</key>
-        <dict>
-          <key>NSExceptionAllowsInsecureHTTPLoads</key>
-          <true/>
-        </dict>
-        <key>192.168.1.231</key>
-        <dict>
-          <key>NSExceptionAllowsInsecureHTTPLoads</key>
-          <true/>
-        </dict>
-      </dict>
     </dict>
+    <key>NSCameraUsageDescription</key>
+    <string>Allow $(PRODUCT_NAME) to access your camera</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
     <string>This app needs access to location to track delivery progress and provide real-time updates even when the app is in the background.</string>
     <key>NSLocationAlwaysUsageDescription</key>
     <string>This app needs access to location to track delivery progress and provide real-time updates even when the app is in the background.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>This app needs access to location to track delivery progress and provide real-time updates.</string>
-    <key>NSCameraUsageDescription</key>
-    <string>This app needs camera access for AR navigation to help deliver orders.</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>This app needs microphone access for audio notifications.</string>
+    <string>Allow $(PRODUCT_NAME) to access your microphone</string>
     <key>NSMotionUsageDescription</key>
-    <string>This app needs motion sensor access to improve indoor positioning accuracy.</string>
-    <key>IndoorAtlasAPIKey</key>
-    <string>7a08a66a-235c-48cf-b746-96bef479c988</string>
-    <key>IndoorAtlasAPISecret</key>
-    <string>T2xE4KoNsKPXBEtYTQmfzZX34N2iDTkKjHxiVcvWuAd68/mlMBSViZFRb7g7MDCouaOAQlDGk0HvyS/p7UcesVCWzPmA2NJUOshZ4Iqc5Zo/PeH61pK500CsQQVfTA==</string>
+    <string>Allow $(PRODUCT_NAME) to access your device motion</string>
     <key>RCTNewArchEnabled</key>
     <true/>
     <key>UIBackgroundModes</key>

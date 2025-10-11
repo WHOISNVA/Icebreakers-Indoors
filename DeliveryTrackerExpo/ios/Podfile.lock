@@ -254,6 +254,7 @@ PODS:
   - hermes-engine (0.81.4):
     - hermes-engine/Pre-built (= 0.81.4)
   - hermes-engine/Pre-built (0.81.4)
+  - IndoorAtlas (3.7.1)
   - RCTDeprecation (0.81.4)
   - RCTRequired (0.81.4)
   - RCTTypeSafety (0.81.4):
@@ -1938,6 +1939,7 @@ DEPENDENCIES:
   - EXUpdatesInterface (from `../node_modules/expo-updates-interface/ios`)
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
+  - IndoorAtlas (~> 3.7)
   - RCTDeprecation (from `../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
   - RCTRequired (from `../node_modules/react-native/Libraries/Required`)
   - RCTTypeSafety (from `../node_modules/react-native/Libraries/TypeSafety`)
@@ -2009,6 +2011,7 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
+    - IndoorAtlas
     - ZXingObjC
 
 EXTERNAL SOURCES:
@@ -2218,6 +2221,7 @@ SPEC CHECKSUMS:
   EXUpdatesInterface: 1436757deb0d574b84bba063bd024c315e0ec08b
   FBLazyVector: 9e0cd874afd81d9a4d36679daca991b58b260d42
   hermes-engine: 35c763d57c9832d0eef764316ca1c4d043581394
+  IndoorAtlas: f3d3c513822245faac9b70c9806bfdf393d590ee
   RCTDeprecation: 7487d6dda857ccd4cb3dd6ecfccdc3170e85dcbc
   RCTRequired: 54128b7df8be566881d48c7234724a78cb9b6157
   RCTTypeSafety: d2b07797a79e45d7b19e1cd2f53c79ab419fe217
@@ -2287,6 +2291,6 @@ SPEC CHECKSUMS:
   Yoga: c8f1aad5bc3522a8fdab409b5843965abff35aa6
   ZXingObjC: 8898711ab495761b2dbbdec76d90164a6d7e14c5
 
-PODFILE CHECKSUM: 3f1e2540b415d592a0be6949b30a43757e1c5581
+PODFILE CHECKSUM: caed03debd08f4daeb668853733c75e7379ae3b3
 
 COCOAPODS: 1.14.3
