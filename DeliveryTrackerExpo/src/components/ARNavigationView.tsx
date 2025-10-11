@@ -186,8 +186,41 @@ export default function ARNavigationView({
     return angle;
   };
 
+  // Calculate vertical tilt for floor navigation
+  const getVerticalTiltAngle = (): number => {
+    if (currentFloor === null || targetFloor === null || targetFloor === undefined) {
+      return 0; // No tilt if floor info unavailable
+    }
+    
+    const floorDifference = targetFloor - currentFloor;
+    
+    if (floorDifference === 0) {
+      return 0; // Same floor, no tilt
+    }
+    
+    // Calculate tilt angle based on floor difference and horizontal distance
+    // More floors = steeper angle, closer distance = steeper angle
+    const horizontalDistance = distance || 50; // Default to 50m if unknown
+    
+    // Average floor height is ~4 meters
+    const verticalDistance = Math.abs(floorDifference) * 4;
+    
+    // Calculate angle using arctangent (opposite/adjacent)
+    const tiltRadians = Math.atan(verticalDistance / horizontalDistance);
+    let tiltDegrees = (tiltRadians * 180) / Math.PI;
+    
+    // Cap the tilt angle at 45 degrees for visibility
+    tiltDegrees = Math.min(tiltDegrees, 45);
+    
+    // Return negative for down, positive for up
+    return floorDifference > 0 ? tiltDegrees : -tiltDegrees;
+  };
+
   const directionAngle = getDirectionAngle();
+  const verticalTilt = getVerticalTiltAngle();
   const isPointingCorrect = Math.abs(directionAngle) < 15; // Within 15 degrees
+  const needsFloorChange = currentFloor !== null && targetFloor !== null && 
+                          targetFloor !== undefined && currentFloor !== targetFloor;
 
   return (
     <View style={styles.container}>
@@ -229,34 +262,83 @@ export default function ARNavigationView({
         <View style={styles.centerContainer}>
           {distance !== null && distance > 15 ? (
             <>
-              {/* Large Arrow pointing to target */}
+              {/* 3D Arrow pointing to target with floor navigation */}
               <View
                 style={[
                   styles.arrowContainer,
-                  { transform: [{ rotate: `${directionAngle}deg` }] },
+                  { 
+                    transform: [
+                      { rotate: `${directionAngle}deg` },
+                      { perspective: 1000 },
+                      { rotateX: `${-verticalTilt}deg` }, // Negative because rotateX is inverted
+                    ] 
+                  },
                 ]}
               >
-                <View style={[styles.arrow, isPointingCorrect && styles.arrowCorrect]}>
-                  <Text style={styles.arrowText}>▲</Text>
+                {/* 3D Arrow with depth effect */}
+                <View style={[
+                  styles.arrow3D, 
+                  isPointingCorrect && !needsFloorChange && styles.arrowCorrect3D
+                ]}>
+                  {/* Arrow shadow/depth layers */}
+                  <View style={[styles.arrowLayer, styles.arrowShadow3]} />
+                  <View style={[styles.arrowLayer, styles.arrowShadow2]} />
+                  <View style={[styles.arrowLayer, styles.arrowShadow1]} />
+                  {/* Main arrow */}
+                  <View style={[styles.arrowLayer, styles.arrowMain]}>
+                    {/* Arrow Point (Triangle) */}
+                    <View style={styles.arrowPointContainer}>
+                      <View style={[
+                        styles.arrowPoint,
+                        isPointingCorrect && !needsFloorChange && styles.arrowPointCorrect,
+                        needsFloorChange && styles.arrowPointFloorChange
+                      ]} />
+                    </View>
+                    {/* Arrow Head (Wide block) */}
+                    <View style={[
+                      styles.arrowHead,
+                      isPointingCorrect && !needsFloorChange && styles.arrowHeadCorrect,
+                      needsFloorChange && styles.arrowHeadFloorChange
+                    ]} />
+                    {/* Arrow Shaft (Narrow block) */}
+                    <View style={[
+                      styles.arrowShaft,
+                      isPointingCorrect && !needsFloorChange && styles.arrowShaftCorrect,
+                      needsFloorChange && styles.arrowShaftFloorChange
+                    ]} />
+                  </View>
                 </View>
               </View>
 
               {/* Direction Text */}
               <View style={styles.directionBox}>
                 <Text style={styles.directionText}>
-                  {isPointingCorrect ? '🎯 Straight Ahead' : getDirectionText(directionAngle)}
+                  {needsFloorChange 
+                    ? `${verticalTilt > 0 ? '⬆️ GO UP' : '⬇️ GO DOWN'} ${Math.abs(targetFloor! - currentFloor!)} Floor${Math.abs(targetFloor! - currentFloor!) > 1 ? 's' : ''}`
+                    : isPointingCorrect ? '🎯 Straight Ahead' : getDirectionText(directionAngle)
+                  }
                 </Text>
                 <Text style={styles.bearingText}>
                   Bearing: {bearing?.toFixed(0)}°
+                  {needsFloorChange && verticalDistance !== null && ` • ${verticalDistance.toFixed(0)}m vertical`}
                 </Text>
               </View>
             </>
           ) : (
-            // Arrived!
+            // Arrived - Show Pin Point!
             <View style={styles.arrivedContainer}>
+              {/* Animated Pin Point Marker */}
+              <View style={styles.pinPointContainer}>
+                <View style={styles.pinPointPulse} />
+                <View style={styles.pinPoint}>
+                  <View style={styles.pinHead} />
+                  <View style={styles.pinShaft} />
+                  <View style={styles.pinShadow} />
+                </View>
+              </View>
               <Text style={styles.arrivedEmoji}>🎉</Text>
               <Text style={styles.arrivedText}>YOU'VE ARRIVED!</Text>
-              <Text style={styles.arrivedSubtext}>You're at the destination</Text>
+              <Text style={styles.arrivedSubtext}>Customer is at this location</Text>
             </View>
           )}
         </View>
@@ -376,32 +458,98 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  arrow: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(0, 122, 255, 0.9)',
+  // 3D Arrow Styles
+  arrow3D: {
+    width: 140,
+    height: 140,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  arrowCorrect3D: {
+    // Add green glow when pointing correct
+  },
+  arrowLayer: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  arrowShadow3: {
+    width: 140,
+    height: 140,
+    opacity: 0.15,
+    transform: [{ translateY: 12 }, { scale: 0.98 }],
+  },
+  arrowShadow2: {
+    width: 140,
+    height: 140,
+    opacity: 0.25,
+    transform: [{ translateY: 8 }, { scale: 0.99 }],
+  },
+  arrowShadow1: {
+    width: 140,
+    height: 140,
+    opacity: 0.35,
+    transform: [{ translateY: 4 }],
+  },
+  arrowMain: {
+    width: 140,
+    height: 140,
+    transform: [{ translateY: 0 }],
+  },
+  arrowPointContainer: {
+    alignItems: 'center',
+  },
+  arrowPoint: {
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 40,
+    borderRightWidth: 40,
+    borderBottomWidth: 35,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#007AFF',
+  },
+  arrowPointCorrect: {
+    borderBottomColor: '#34C759',
+  },
+  arrowPointFloorChange: {
+    borderBottomColor: '#FF9500',
+  },
+  arrowHead: {
+    width: 80,
+    height: 30,
+    backgroundColor: '#007AFF',
+    marginTop: -1, // Slight overlap with point
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
   },
-  arrowCorrect: {
-    backgroundColor: 'rgba(52, 199, 89, 0.9)',
-    borderColor: '#FFF',
-    borderWidth: 6,
+  arrowShaft: {
+    width: 50,
+    height: 50,
+    backgroundColor: '#007AFF',
+    marginTop: 0,
+    borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
   },
-  arrowText: {
-    color: '#FFF',
-    fontSize: 60,
-    fontWeight: '900',
-    textShadowColor: '#000',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+  arrowHeadCorrect: {
+    backgroundColor: '#34C759', // Green when pointing correct
+  },
+  arrowShaftCorrect: {
+    backgroundColor: '#34C759', // Green when pointing correct
+  },
+  arrowHeadFloorChange: {
+    backgroundColor: '#FF9500', // Orange when floor change needed
+  },
+  arrowShaftFloorChange: {
+    backgroundColor: '#FF9500', // Orange when floor change needed
   },
   directionBox: {
     marginTop: 20,
@@ -448,6 +596,59 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 18,
     fontWeight: '600',
+  },
+  // Pin Point Marker Styles
+  pinPointContainer: {
+    position: 'absolute',
+    top: -120,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pinPointPulse: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255, 59, 48, 0.3)',
+    // This would animate in production - requires Animated API
+  },
+  pinPoint: {
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    height: 80,
+    width: 60,
+  },
+  pinHead: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#FF3B30',
+    borderWidth: 4,
+    borderColor: '#FFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    // Inner circle effect
+    position: 'relative',
+  },
+  pinShaft: {
+    width: 8,
+    height: 30,
+    backgroundColor: '#FF3B30',
+    marginTop: -8,
+    borderRadius: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+  },
+  pinShadow: {
+    width: 40,
+    height: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    marginTop: 4,
   },
   // Bottom Bar
   bottomBar: {
