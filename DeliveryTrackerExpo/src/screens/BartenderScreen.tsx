@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Linking, Alert, Modal } from 'react-native';
 import MapView, { Marker, Circle, PROVIDER_DEFAULT } from 'react-native-maps';
 import { orderService } from '../services/OrderService';
@@ -26,6 +26,9 @@ export default function BartenderScreen() {
   const [showMapModal, setShowMapModal] = useState(false);
   const [showARView, setShowARView] = useState(false);
   const [deliveryStatus, setDeliveryStatus] = useState<any>(null);
+  const [showAllPins, setShowAllPins] = useState(true);
+  
+  const mapRef = useRef<MapView>(null);
 
   const formatOrderItems = (order: Order): string =>
     order.items.map(it => `${it.name} x${it.quantity}`).join(', ');
@@ -103,39 +106,58 @@ export default function BartenderScreen() {
   
 
   const openDeliveryMap = (order?: Order) => {
-    if (order) {
-      setSelectedOrder(order);
-      
-      // Start tracking this specific delivery
-      const location = order.currentLocation || order.origin;
-      DeliveryTrackingService.trackDelivery(
-        order.id,
-        { latitude: location.latitude, longitude: location.longitude },
-        (orderId) => {
-          // Called when server arrives
-          Alert.alert(
-            '✅ Arrived!',
-            `You've reached the customer location for order ${orderId}`,
-            [
-              {
-                text: 'Mark Delivered',
-                onPress: () => {
-                  orderService.updateStatus(orderId, 'completed');
-                  setSelectedOrder(null);
-                  DeliveryTrackingService.stopTrackingDelivery(orderId);
+    try {
+      if (order) {
+        setSelectedOrder(order);
+        setShowAllPins(false); // Show only this order's pin
+        
+        // Start tracking this specific delivery
+        const location = order.currentLocation || order.origin;
+        DeliveryTrackingService.trackDelivery(
+          order.id,
+          { latitude: location.latitude, longitude: location.longitude },
+          (orderId) => {
+            // Called when server arrives
+            Alert.alert(
+              '✅ Arrived!',
+              `You've reached the customer location for order ${orderId}`,
+              [
+                {
+                  text: 'Mark Delivered',
+                  onPress: () => {
+                    orderService.updateStatus(orderId, 'completed');
+                    setSelectedOrder(null);
+                    DeliveryTrackingService.stopTrackingDelivery(orderId);
+                  },
                 },
-              },
-              {
-                text: 'Continue',
-                style: 'cancel',
-              },
-            ]
-          );
-        }
+                {
+                  text: 'Continue',
+                  style: 'cancel',
+                },
+              ]
+            );
+          }
+        );
+        
+        // Zoom to this order after modal opens
+        setTimeout(() => {
+          try {
+            zoomToOrder(order);
+          } catch (error) {
+            console.error('Error zooming to order:', error);
+          }
+        }, 300); // Delay to ensure map is rendered
+      }
+      
+      setShowMapModal(true);
+    } catch (error) {
+      console.error('Error opening delivery map:', error);
+      Alert.alert(
+        'Map Error',
+        'Could not open map. This might be due to missing Google Maps configuration on Android.',
+        [{ text: 'OK' }]
       );
     }
-    
-    setShowMapModal(true);
   };
 
   const closeMap = () => {
@@ -175,6 +197,33 @@ export default function BartenderScreen() {
       DeliveryTrackingService.stopTrackingDelivery(selectedOrder.id);
     }
     setSelectedOrder(null);
+    setShowAllPins(true);
+    
+    // Zoom to show all pins
+    if (mapRef.current && pending.length > 0) {
+      const coordinates = pending.map(order => ({
+        latitude: (order.currentLocation || order.origin).latitude,
+        longitude: (order.currentLocation || order.origin).longitude,
+      }));
+      
+      mapRef.current.fitToCoordinates(coordinates, {
+        edgePadding: { top: 100, right: 50, bottom: 300, left: 50 },
+        animated: true,
+      });
+    }
+  };
+
+  const zoomToOrder = (order: Order) => {
+    const location = order.currentLocation || order.origin;
+    
+    if (mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: location.latitude,
+        longitude: location.longitude,
+        latitudeDelta: 0.005, // Closer zoom for single order
+        longitudeDelta: 0.005,
+      }, 500);
+    }
   };
 
   const handleARArrival = () => {
@@ -357,6 +406,7 @@ export default function BartenderScreen() {
           {showMapModal && (
             <>
               <MapView
+                ref={mapRef}
                 style={styles.map}
                 provider={PROVIDER_DEFAULT}
                 initialRegion={
@@ -385,47 +435,52 @@ export default function BartenderScreen() {
                 rotateEnabled={true} // Allow rotation
                 showsCompass={true} // Show compass
               >
-                {/* Show ALL unfulfilled order markers */}
-                {pending.map((order) => {
-                  const location = order.currentLocation || order.origin;
-                  const isSelected = selectedOrder?.id === order.id;
-                  
-                  return (
-                    <React.Fragment key={order.id}>
-                      <Marker
-                        coordinate={{
-                          latitude: location.latitude,
-                          longitude: location.longitude,
-                        }}
-                        title={`Order ${order.id}`}
-                        description={order.detailsNote || `${order.items.map(i => i.name).join(', ')}`}
-                        pinColor={isSelected ? 'red' : 'orange'}
-                        onPress={() => {
-                          setSelectedOrder(order);
-                          const loc = order.currentLocation || order.origin;
-                          DeliveryTrackingService.trackDelivery(
-                            order.id,
-                            { latitude: loc.latitude, longitude: loc.longitude },
-                            (orderId) => {
-                              Alert.alert(
-                                '✅ Arrived!',
-                                `You've reached the customer location for order ${orderId}`,
-                                [
-                                  {
-                                    text: 'Mark Delivered',
-                                    onPress: () => {
-                                      orderService.updateStatus(orderId, 'completed');
-                                      setSelectedOrder(null);
-                                      DeliveryTrackingService.stopTrackingDelivery(orderId);
+                {/* Show unfulfilled order markers (filtered by showAllPins) */}
+                {pending
+                  .filter(order => showAllPins || selectedOrder?.id === order.id)
+                  .map((order) => {
+                    const location = order.currentLocation || order.origin;
+                    const isSelected = selectedOrder?.id === order.id;
+                    
+                    return (
+                      <React.Fragment key={order.id}>
+                        <Marker
+                          coordinate={{
+                            latitude: location.latitude,
+                            longitude: location.longitude,
+                          }}
+                          title={`Order ${order.id}`}
+                          description={order.detailsNote || `${order.items.map(i => i.name).join(', ')}`}
+                          pinColor={isSelected ? 'red' : 'orange'}
+                          onPress={() => {
+                            setSelectedOrder(order);
+                            setShowAllPins(false); // Hide other pins when one is selected
+                            zoomToOrder(order); // Zoom to this order
+                            const loc = order.currentLocation || order.origin;
+                            DeliveryTrackingService.trackDelivery(
+                              order.id,
+                              { latitude: loc.latitude, longitude: loc.longitude },
+                              (orderId) => {
+                                Alert.alert(
+                                  '✅ Arrived!',
+                                  `You've reached the customer location for order ${orderId}`,
+                                  [
+                                    {
+                                      text: 'Mark Delivered',
+                                      onPress: () => {
+                                        orderService.updateStatus(orderId, 'completed');
+                                        setSelectedOrder(null);
+                                        setShowAllPins(true); // Show all pins again
+                                        DeliveryTrackingService.stopTrackingDelivery(orderId);
+                                      },
                                     },
-                                  },
-                                  { text: 'Continue', style: 'cancel' },
-                                ]
-                              );
-                            }
-                          );
-                        }}
-                      />
+                                    { text: 'Continue', style: 'cancel' },
+                                  ]
+                                );
+                              }
+                            );
+                          }}
+                        />
                       
                       {/* Show arrival circle for selected order */}
                       {isSelected && (
@@ -434,7 +489,7 @@ export default function BartenderScreen() {
                             latitude: location.latitude,
                             longitude: location.longitude,
                           }}
-                          radius={15}
+                          radius={3}
                           fillColor="rgba(255, 59, 48, 0.2)"
                           strokeColor="rgba(255, 59, 48, 0.5)"
                           strokeWidth={2}
@@ -459,9 +514,9 @@ export default function BartenderScreen() {
                     )}
                     <View style={styles.statusRow}>
                       <Text style={styles.statusLabel}>Distance:</Text>
-                      <Text style={[styles.statusValue, deliveryStatus.distanceToCustomer <= 15 ? styles.statusNear : null]}>
+                      <Text style={[styles.statusValue, deliveryStatus.distanceToCustomer <= 3 ? styles.statusNear : null]}>
                         {formatDistance(deliveryStatus.distanceToCustomer)}
-                        {deliveryStatus.distanceToCustomer <= 15 && ' 🎯'}
+                        {deliveryStatus.distanceToCustomer <= 3 && ' 🎯'}
                       </Text>
                     </View>
                     {deliveryStatus.hasArrived && (
@@ -472,11 +527,15 @@ export default function BartenderScreen() {
                   </>
                 ) : (
                   <>
-                    <Text style={styles.statusTitle}>All Orders ({pending.length})</Text>
+                    <Text style={styles.statusTitle}>
+                      {showAllPins ? `All Orders (${pending.length})` : 'Select an Order'}
+                    </Text>
                     <Text style={styles.statusNote}>
-                      🔴 Red pin = Selected order{'\n'}
-                      🟠 Orange pins = Other orders{'\n'}
-                      Tap any pin to navigate
+                      {showAllPins ? (
+                        <>🟠 Orange pins = Orders{'\n'}Tap any pin to zoom & navigate</>
+                      ) : (
+                        <>No order selected{'\n'}Tap "View All" to see all orders</>
+                      )}
                     </Text>
                     <View style={styles.mapTip}>
                       <Text style={styles.mapTipText}>💡 Pinch to zoom • 2 fingers to rotate • Tilt for 3D view</Text>
@@ -490,14 +549,14 @@ export default function BartenderScreen() {
                 <TouchableOpacity style={[styles.mapBtn, styles.mapBtnSecondary]} onPress={closeMap}>
                   <Text style={styles.mapBtnTextSecondary}>Close</Text>
                 </TouchableOpacity>
-                {selectedOrder && (
-                  <TouchableOpacity 
-                    style={[styles.mapBtn, styles.mapBtnSecondary]} 
-                    onPress={viewAllOnMap}
-                  >
-                    <Text style={styles.mapBtnTextSecondary}>View All ({unfulfilled.length})</Text>
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity 
+                  style={[styles.mapBtn, showAllPins ? styles.mapBtnSecondary : styles.mapBtnPrimary]} 
+                  onPress={viewAllOnMap}
+                >
+                  <Text style={showAllPins ? styles.mapBtnTextSecondary : styles.mapBtnText}>
+                    {showAllPins ? `Viewing All (${pending.length})` : `View All (${pending.length})`}
+                  </Text>
+                </TouchableOpacity>
                 {selectedOrder && (
                   <>
                     <TouchableOpacity 

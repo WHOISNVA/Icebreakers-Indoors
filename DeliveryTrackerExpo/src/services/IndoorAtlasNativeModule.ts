@@ -26,17 +26,14 @@ let nativeModule: IndoorAtlasNativeModule | null = null;
 let eventEmitter: NativeEventEmitter | null = null;
 
 try {
-  if (Platform.OS === 'android') {
-    // Android: Use the existing react-native-indoor-atlas package
-    const IndoorAtlasAndroid = require('react-native-indoor-atlas');
-    nativeModule = IndoorAtlasAndroid;
-  } else if (Platform.OS === 'ios') {
-    // iOS: Use our custom native module
-    const { RNIndoorAtlasModule } = NativeModules;
-    if (RNIndoorAtlasModule) {
-      nativeModule = RNIndoorAtlasModule;
-      eventEmitter = new NativeEventEmitter(RNIndoorAtlasModule);
-    }
+  // Use our custom native module for both Android and iOS
+  const { RNIndoorAtlasModule } = NativeModules;
+  if (RNIndoorAtlasModule) {
+    nativeModule = RNIndoorAtlasModule;
+    eventEmitter = new NativeEventEmitter(RNIndoorAtlasModule);
+    console.log('✅ IndoorAtlas native module loaded successfully');
+  } else {
+    console.log('⚠️ RNIndoorAtlasModule not found in NativeModules');
   }
 } catch (error) {
   console.log('⚠️ IndoorAtlas native module not available:', error);

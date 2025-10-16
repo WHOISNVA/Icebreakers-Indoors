@@ -5,7 +5,7 @@ import * as Location from 'expo-location';
 import { Magnetometer } from 'expo-sensors';
 import { calculateDistance, calculateBearing, formatDistance, formatFloor, estimateFloor, calculateVerticalDistance } from '../utils/locationUtils';
 import IndoorAtlasService from '../services/IndoorAtlasService';
-import IndoorAtlasARService from '../services/IndoorAtlasARService';
+import IndoorAtlasARService, { IARoute, IAWaypoint } from '../services/IndoorAtlasARService';
 
 interface ARNavigationViewProps {
   targetLatitude: number;
@@ -36,9 +36,12 @@ export default function ARNavigationView({
   const [hasArrived, setHasArrived] = useState(false);
   const [currentFloor, setCurrentFloor] = useState<number | null>(null);
   const [verticalDistance, setVerticalDistance] = useState<number | null>(null);
+  const [useIndoorAtlasHeading, setUseIndoorAtlasHeading] = useState(false);
+  const [wayfindingRoute, setWayfindingRoute] = useState<IARoute | null>(null);
   
   const magnetometerSubscription = useRef<any>(null);
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
+  const wayfindingUnsubscribe = useRef<(() => void) | null>(null);
 
   // Request camera permission
   useEffect(() => {
@@ -66,17 +69,8 @@ export default function ARNavigationView({
   // Track current location
   useEffect(() => {
     const startTracking = async () => {
-      // Start IndoorAtlas AR wayfinding (if available)
-      if (IndoorAtlasARService.isARWayfindingAvailable()) {
-        await IndoorAtlasARService.startARWayfinding(
-          targetLatitude,
-          targetLongitude,
-          targetFloor ?? undefined
-        );
-        console.log('🎯 IndoorAtlas AR wayfinding enabled');
-      }
-
       // Use IndoorAtlas for precise tracking (falls back to GPS automatically)
+      // This also initializes IndoorAtlas if not already initialized
       const unsubscribe = await IndoorAtlasService.watchPosition((position) => {
         // Convert to Location.LocationObject format for compatibility
         const locationObject: Location.LocationObject = {
@@ -93,6 +87,13 @@ export default function ARNavigationView({
         };
         
         setCurrentLocation(locationObject);
+
+        // Use IndoorAtlas heading if available (much more accurate than magnetometer indoors!)
+        if (position.heading !== null && position.heading !== undefined && position.heading !== 0) {
+          setHeading(position.heading);
+          setUseIndoorAtlasHeading(true);
+          console.log(`🧭 Using IndoorAtlas heading: ${position.heading.toFixed(0)}°`);
+        }
 
         // Calculate distance to target
         const dist = calculateDistance(
@@ -127,25 +128,57 @@ export default function ARNavigationView({
           setVerticalDistance(vertDist);
         }
 
-        // Check if arrived (within 15 meters horizontally)
-        if (dist <= 15 && !hasArrived) {
+        // Check if arrived (within 3 meters - exact location)
+        // This ensures we only show "ARRIVED" when at the precise pin location
+        if (dist <= 3 && !hasArrived) {
           setHasArrived(true);
           onArrived?.();
         }
         
-        console.log(`📍 AR Position: ${position.source} - dist=${dist.toFixed(1)}m, accuracy=${position.accuracy.toFixed(1)}m`);
+        console.log(`📍 AR Position: ${position.source} - dist=${dist.toFixed(1)}m, accuracy=${position.accuracy.toFixed(1)}m, heading=${position.heading?.toFixed(0)}°`);
       });
 
       locationSubscription.current = { remove: unsubscribe } as any;
+      
+      // Start wayfinding AFTER IndoorAtlas is initialized
+      // Wait 1 second for initialization to complete
+      if (IndoorAtlasARService.isARWayfindingAvailable()) {
+        setTimeout(async () => {
+          try {
+            const wayfindingStarted = await IndoorAtlasARService.startARWayfinding(
+              targetLatitude,
+              targetLongitude,
+              targetFloor ?? undefined
+            );
+            
+            if (wayfindingStarted) {
+              console.log('🎯 IndoorAtlas wayfinding started successfully');
+              
+              // Subscribe to wayfinding route updates
+              wayfindingUnsubscribe.current = IndoorAtlasARService.onWayfindingUpdate((route) => {
+                console.log(`🗺️ Wayfinding route received: ${route.waypoints.length} waypoints, ${route.length}m`);
+                setWayfindingRoute(route);
+              });
+            }
+          } catch (error) {
+            console.log('⚠️ Wayfinding not available:', error);
+            // Continue without wayfinding - will use direct arrow guidance
+          }
+        }, 1000);
+      }
     };
 
     startTracking();
 
     return () => {
-      // Stop IndoorAtlas AR wayfinding
+      // Stop wayfinding
       if (IndoorAtlasARService.isARWayfindingAvailable()) {
-        IndoorAtlasARService.stopARWayfinding();
+        IndoorAtlasARService.stopARWayfinding().catch(err => 
+          console.log('⚠️ Error stopping wayfinding:', err)
+        );
+        wayfindingUnsubscribe.current?.();
       }
+      
       locationSubscription.current?.remove();
     };
   }, [targetLatitude, targetLongitude, targetFloor, hasArrived, onArrived]);
@@ -222,6 +255,88 @@ export default function ARNavigationView({
   const needsFloorChange = currentFloor !== null && targetFloor !== null && 
                           targetFloor !== undefined && currentFloor !== targetFloor;
 
+  // Render 3D waypoint markers along the route
+  const renderWaypoints = () => {
+    if (!wayfindingRoute || !currentLocation || distance === null || distance > 50) {
+      return null; // Don't show waypoints if too far or no route
+    }
+
+    return wayfindingRoute.waypoints.map((waypoint, index) => {
+      // Skip waypoints on different floors
+      if (currentFloor !== null && waypoint.floor !== undefined && waypoint.floor !== currentFloor) {
+        return null;
+      }
+
+      // Calculate distance to this waypoint
+      const waypointDist = calculateDistance(
+        currentLocation.coords.latitude,
+        currentLocation.coords.longitude,
+        waypoint.latitude,
+        waypoint.longitude
+      );
+
+      // Only show waypoints within 30 meters
+      if (waypointDist > 30) {
+        return null;
+      }
+
+      // Calculate bearing to waypoint
+      const waypointBearing = calculateBearing(
+        currentLocation.coords.latitude,
+        currentLocation.coords.longitude,
+        waypoint.latitude,
+        waypoint.longitude
+      );
+
+      // Calculate relative angle for this waypoint
+      let waypointAngle = waypointBearing - heading;
+      while (waypointAngle > 180) waypointAngle -= 360;
+      while (waypointAngle < -180) waypointAngle += 360;
+
+      // Only show waypoints roughly in front (within 120 degrees)
+      if (Math.abs(waypointAngle) > 120) {
+        return null;
+      }
+
+      // Calculate screen position based on angle
+      // Center is 0, left is negative, right is positive
+      const horizontalOffset = (waypointAngle / 120) * (width * 0.4);
+
+      // Calculate vertical position based on distance (closer = lower on screen)
+      const verticalOffset = Math.max(-100, -waypointDist * 3);
+
+      // Scale based on distance (closer = larger)
+      const scale = Math.max(0.5, Math.min(1.5, 15 / waypointDist));
+
+      return (
+        <View
+          key={`waypoint-${index}`}
+          style={[
+            styles.waypoint3D,
+            {
+              transform: [
+                { translateX: horizontalOffset },
+                { translateY: verticalOffset },
+                { scale },
+              ],
+            },
+          ]}
+        >
+          {/* 3D waypoint sphere */}
+          <View style={styles.waypointSphere}>
+            <View style={[styles.waypointLayer, styles.waypointShadowLayer]} />
+            <View style={[styles.waypointLayer, styles.waypointMainLayer]} />
+            <View style={styles.waypointGlow} />
+          </View>
+          {/* Distance label */}
+          <Text style={styles.waypointDistanceText}>
+            {waypointDist.toFixed(0)}m
+          </Text>
+        </View>
+      );
+    }).filter(Boolean); // Remove null entries
+  };
+
   return (
     <View style={styles.container}>
       {/* Camera View */}
@@ -258,9 +373,84 @@ export default function ARNavigationView({
           </TouchableOpacity>
         </View>
 
+        {/* 3D Pin Marker - Only visible when within 3 meters */}
+        {distance !== null && distance <= 3 && (
+          <View style={styles.pinMarkerContainer}>
+            <View
+              style={[
+                styles.pinMarker3DContainer,
+                { 
+                  transform: [
+                    { rotate: `${directionAngle}deg` },
+                    { perspective: 1500 },
+                    { rotateX: `${-verticalTilt}deg` },
+                    // Scale based on distance for depth perception (larger when closer)
+                    { scale: distance !== null ? Math.min(2.0, Math.max(1.0, 6 / distance)) : 1 },
+                  ] 
+                },
+              ]}
+            >
+              {/* 3D Pin with shadow layers */}
+              <View style={styles.pin3D}>
+                {/* Pin shadow/depth layers for 3D effect */}
+                <View style={[styles.pinLayer, styles.pinShadowLayer3]} />
+                <View style={[styles.pinLayer, styles.pinShadowLayer2]} />
+                <View style={[styles.pinLayer, styles.pinShadowLayer1]} />
+                {/* Main pin */}
+                <View style={[styles.pinLayer, styles.pinMainLayer]}>
+                  {/* Pin Head (Circle) */}
+                  <View style={[
+                    styles.pinHeadMarker,
+                    hasArrived && styles.pinHeadMarkerArrived
+                  ]} />
+                  {/* Pin Shaft (Vertical line) */}
+                  <View style={[
+                    styles.pinShaftMarker,
+                    hasArrived && styles.pinShaftMarkerArrived
+                  ]} />
+                  {/* Pin Point (Small triangle at bottom) */}
+                  <View style={[
+                    styles.pinPointMarker,
+                    hasArrived && styles.pinPointMarkerArrived
+                  ]} />
+                </View>
+              </View>
+              {/* Pulsing circle at base of pin */}
+              <View style={[
+                styles.pinBasePulse,
+                hasArrived && styles.pinBasePulseArrived
+              ]} />
+              
+              {/* Celebration animation when arrived */}
+              {hasArrived && (
+                <View style={styles.celebrationContainer}>
+                  {/* Confetti/sparkles effect */}
+                  <Text style={[styles.celebrationEmoji, styles.celebrationEmoji1]}>🎉</Text>
+                  <Text style={[styles.celebrationEmoji, styles.celebrationEmoji2]}>✨</Text>
+                  <Text style={[styles.celebrationEmoji, styles.celebrationEmoji3]}>🎊</Text>
+                  <Text style={[styles.celebrationEmoji, styles.celebrationEmoji4]}>⭐</Text>
+                  <Text style={[styles.celebrationEmoji, styles.celebrationEmoji5]}>💫</Text>
+                  <Text style={[styles.celebrationEmoji, styles.celebrationEmoji6]}>🌟</Text>
+                  {/* Radiating circles */}
+                  <View style={[styles.celebrationRing, styles.celebrationRing1]} />
+                  <View style={[styles.celebrationRing, styles.celebrationRing2]} />
+                  <View style={[styles.celebrationRing, styles.celebrationRing3]} />
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* 3D Waypoint Markers along route */}
+        {wayfindingRoute && distance !== null && distance > 3 && (
+          <View style={styles.waypointsContainer}>
+            {renderWaypoints()}
+          </View>
+        )}
+
         {/* Direction Arrow - Center of Screen */}
         <View style={styles.centerContainer}>
-          {distance !== null && distance > 15 ? (
+          {distance !== null && distance > 3 ? (
             <>
               {/* 3D Arrow pointing to target with floor navigation */}
               <View
@@ -325,20 +515,12 @@ export default function ARNavigationView({
               </View>
             </>
           ) : (
-            // Arrived - Show Pin Point!
+            // Arrived - Show larger celebration pin!
             <View style={styles.arrivedContainer}>
-              {/* Animated Pin Point Marker */}
-              <View style={styles.pinPointContainer}>
-                <View style={styles.pinPointPulse} />
-                <View style={styles.pinPoint}>
-                  <View style={styles.pinHead} />
-                  <View style={styles.pinShaft} />
-                  <View style={styles.pinShadow} />
-                </View>
-              </View>
               <Text style={styles.arrivedEmoji}>🎉</Text>
               <Text style={styles.arrivedText}>YOU'VE ARRIVED!</Text>
               <Text style={styles.arrivedSubtext}>Customer is at this location</Text>
+              <Text style={styles.arrivedSubtext}>📍 Look for the glowing pin above</Text>
             </View>
           )}
         </View>
@@ -352,7 +534,7 @@ export default function ARNavigationView({
             <Text style={styles.compassLabel}>Heading: {heading.toFixed(0)}°</Text>
           </View>
 
-          {distance !== null && distance > 15 && (
+          {distance !== null && distance > 3 && (
             <View style={styles.instructions}>
               <Text style={styles.instructionText}>
                 📱 Point camera in the direction of the arrow
@@ -597,7 +779,178 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
-  // Pin Point Marker Styles
+  // 3D Pin Marker Styles (Always visible in AR)
+  pinMarkerContainer: {
+    position: 'absolute',
+    top: '30%', // Position in upper portion of screen
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    pointerEvents: 'none', // Don't block touch events
+  },
+  pinMarker3DContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pin3D: {
+    width: 80,
+    height: 100,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  pinLayer: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    width: 80,
+    height: 100,
+  },
+  pinShadowLayer3: {
+    opacity: 0.15,
+    transform: [{ translateY: 12 }, { scale: 0.97 }],
+  },
+  pinShadowLayer2: {
+    opacity: 0.25,
+    transform: [{ translateY: 8 }, { scale: 0.98 }],
+  },
+  pinShadowLayer1: {
+    opacity: 0.35,
+    transform: [{ translateY: 4 }, { scale: 0.99 }],
+  },
+  pinMainLayer: {
+    transform: [{ translateY: 0 }],
+  },
+  pinHeadMarker: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FF3B30',
+    borderWidth: 5,
+    borderColor: '#FFF',
+    shadowColor: '#FF3B30',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  pinHeadMarkerArrived: {
+    backgroundColor: '#34C759',
+    shadowColor: '#34C759',
+    borderWidth: 6,
+  },
+  pinShaftMarker: {
+    width: 10,
+    height: 40,
+    backgroundColor: '#FF3B30',
+    marginTop: -10,
+    borderRadius: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+  },
+  pinShaftMarkerArrived: {
+    backgroundColor: '#34C759',
+  },
+  pinPointMarker: {
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 10,
+    borderRightWidth: 10,
+    borderTopWidth: 15,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#FF3B30',
+    marginTop: -2,
+  },
+  pinPointMarkerArrived: {
+    borderTopColor: '#34C759',
+  },
+  pinBasePulse: {
+    position: 'absolute',
+    bottom: -10,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 59, 48, 0.3)',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 59, 48, 0.5)',
+    // This would animate in production
+  },
+  pinBasePulseArrived: {
+    backgroundColor: 'rgba(52, 199, 89, 0.4)',
+    borderColor: 'rgba(52, 199, 89, 0.6)',
+  },
+  // Celebration Animation Styles
+  celebrationContainer: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    alignItems: 'center',
+    justifyContent: 'center',
+    top: -100,
+  },
+  celebrationEmoji: {
+    position: 'absolute',
+    fontSize: 32,
+    // In production, these would be animated using React Native Animated API
+  },
+  celebrationEmoji1: {
+    top: -40,
+    left: -20,
+    // Would animate: translateY from -40 to -80, opacity from 1 to 0
+  },
+  celebrationEmoji2: {
+    top: -30,
+    right: -10,
+    // Would animate: translateY from -30 to -70, opacity from 1 to 0
+  },
+  celebrationEmoji3: {
+    top: -50,
+    left: 30,
+    // Would animate: translateY from -50 to -90, opacity from 1 to 0
+  },
+  celebrationEmoji4: {
+    top: -35,
+    right: 35,
+    // Would animate: translateY from -35 to -75, opacity from 1 to 0
+  },
+  celebrationEmoji5: {
+    top: -45,
+    left: -30,
+    // Would animate: translateY from -45 to -85, opacity from 1 to 0
+  },
+  celebrationEmoji6: {
+    top: -25,
+    right: -25,
+    // Would animate: translateY from -25 to -65, opacity from 1 to 0
+  },
+  celebrationRing: {
+    position: 'absolute',
+    borderRadius: 1000,
+    borderWidth: 3,
+    borderColor: 'rgba(52, 199, 89, 0.5)',
+    // In production, would animate scale and opacity
+  },
+  celebrationRing1: {
+    width: 100,
+    height: 100,
+    // Would animate: scale from 0.5 to 2.0, opacity from 0.8 to 0
+  },
+  celebrationRing2: {
+    width: 100,
+    height: 100,
+    // Would animate: scale from 0.5 to 2.5, opacity from 0.6 to 0 (delayed)
+  },
+  celebrationRing3: {
+    width: 100,
+    height: 100,
+    // Would animate: scale from 0.5 to 3.0, opacity from 0.4 to 0 (more delayed)
+  },
+  // Pin Point Marker Styles (Old - kept for arrived state reference)
   pinPointContainer: {
     position: 'absolute',
     top: -120,
@@ -713,6 +1066,62 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 18,
     fontWeight: '700',
+  },
+  // 3D Waypoint Styles
+  waypointsContainer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    pointerEvents: 'none',
+  },
+  waypoint3D: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  waypointSphere: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  waypointLayer: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  waypointShadowLayer: {
+    backgroundColor: 'rgba(0, 122, 255, 0.3)',
+    transform: [{ scale: 1.2 }],
+  },
+  waypointMainLayer: {
+    backgroundColor: '#007AFF',
+    borderWidth: 3,
+    borderColor: '#FFF',
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 15,
+    elevation: 10,
+  },
+  waypointGlow: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(0, 122, 255, 0.2)',
+    borderWidth: 2,
+    borderColor: 'rgba(0, 122, 255, 0.4)',
+  },
+  waypointDistanceText: {
+    marginTop: 4,
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '700',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 });
 

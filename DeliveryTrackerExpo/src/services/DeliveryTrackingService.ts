@@ -17,7 +17,7 @@ export interface DeliveryStatus {
   arrivedAt?: number; // timestamp
 }
 
-const ARRIVAL_THRESHOLD = 15; // meters - consider arrived if within 15m
+const ARRIVAL_THRESHOLD = 3; // meters - consider arrived if within 3m (exact location)
 const ARRIVAL_CONFIRMATION_TIME = 3000; // ms - stay within threshold for 3 seconds
 
 class DeliveryTrackingService {
@@ -32,11 +32,19 @@ class DeliveryTrackingService {
    */
   public async startServerTracking(): Promise<boolean> {
     try {
+      // Don't start if already tracking
+      if (this.locationSubscription) {
+        console.log('📍 Server tracking already active');
+        return true;
+      }
+
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        console.error('Location permission not granted');
+        console.error('📍 Location permission not granted');
         return false;
       }
+
+      console.log('📍 Starting server location tracking...');
 
       this.locationSubscription = await Location.watchPositionAsync(
         {
@@ -57,9 +65,10 @@ class DeliveryTrackingService {
         }
       );
 
+      console.log('✅ Server location tracking started');
       return true;
     } catch (error) {
-      console.error('Failed to start server tracking:', error);
+      console.error('❌ Failed to start server tracking:', error);
       return false;
     }
   }
@@ -94,9 +103,16 @@ class DeliveryTrackingService {
     customerLocation: { latitude: number; longitude: number },
     onArrival?: (orderId: string) => void
   ): void {
+    // If server location is not available yet, use customer location as starting point
+    const initialServerLocation = this.serverLocation || {
+      ...customerLocation,
+      accuracy: 0,
+      timestamp: Date.now(),
+    };
+
     const deliveryStatus: DeliveryStatus = {
       orderId,
-      serverLocation: this.serverLocation!,
+      serverLocation: initialServerLocation,
       customerLocation: {
         ...customerLocation,
         accuracy: 0,
